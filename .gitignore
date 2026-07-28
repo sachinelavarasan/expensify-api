@@ -39,3 +39,5 @@ lerna-debug.log*
 
 *firebase-adminsdk*.json
 *service*.json
+.vercel
+.env*
