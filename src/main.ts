@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { STATUS_CODES } from 'http';
-import { json, urlencoded, raw } from 'express';
+import { json, urlencoded } from 'express';
 import * as firebase from 'firebase-admin';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
@@ -28,13 +28,7 @@ async function bootstrap() {
   });
 
   app.use(urlencoded({ extended: false }));
-  app.use((req, res, next) => {
-    if (req.originalUrl === '/expensify/clerk/webhook') {
-      raw({ type: 'application/json' })(req, res, next);
-    } else {
-      json({ limit: '100mb' })(req, res, next);
-    }
-  });
+  app.use(json({ limit: '100mb' }));
   app.useGlobalPipes(
     new ValidationPipe({
       exceptionFactory: (errors) => {

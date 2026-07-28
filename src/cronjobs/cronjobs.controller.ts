@@ -1,13 +1,14 @@
 import { Controller, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
 
 import { CronjobsService } from './cronjobs.service';
+import { secureCompare } from 'src/common/secure-compare';
 
 @Controller('crons')
 export class CronjobsController {
   constructor(private readonly cronjobsService: CronjobsService) {}
 
   private assertAuthorized(cronToken: string) {
-    if (!process.env.CRON_SECRET_TOKEN || cronToken !== process.env.CRON_SECRET_TOKEN) {
+    if (!secureCompare(cronToken, process.env.CRON_SECRET_TOKEN)) {
       throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
     }
   }

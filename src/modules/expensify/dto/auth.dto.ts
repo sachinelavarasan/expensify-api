@@ -1,17 +1,5 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
-export class ExpensifySignUpDto {
-  email?: string;
-  id?: string;
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsNotEmpty()
-  phone?: string;
-  delete?: boolean;
-}
-
 export class TransactionDto {
   @IsString()
   @IsNotEmpty()

@@ -12,11 +12,10 @@ export class ExpensifyUserRepository {
     private readonly dbObject: Database,
   ) {}
 
-  async getOne(args: { id?: string; phone?: string; user_id?: string; email?: string }) {
+  async getOne(args: { phone?: string; user_id?: string; email?: string }) {
     return await this.dbObject.db.query.expensifyUsers.findFirst({
       where: (expensifyUsers, { eq }) => {
         const conditions: any = [];
-        if (args && args.id) conditions.push(eq(expensifyUsers.exp_us_clerk_id, args.id));
         if (args && args.user_id) conditions.push(eq(expensifyUsers.exp_us_id, args.user_id));
         if (args && args.phone) conditions.push(eq(expensifyUsers.exp_us_phone_no, args.phone));
         if (args && args.email) conditions.push(eq(expensifyUsers.exp_us_email, args.email));
@@ -69,16 +68,13 @@ export class ExpensifyUserRepository {
   }
   async updateUser(
     data: Partial<InsertExpensifyUser>,
-    args: { exp_us_phone_no?: string; exp_us_clerk_id?: string; exp_user_id?: string },
+    args: { exp_us_phone_no?: string; exp_user_id?: string },
   ) {
     return await this.dbObject.db
       .update(expensifyUsers)
       .set(data)
       .where(
         and(
-          args.exp_us_clerk_id
-            ? eq(expensifyUsers.exp_us_clerk_id, args.exp_us_clerk_id)
-            : undefined,
           args.exp_us_phone_no
             ? eq(expensifyUsers.exp_us_phone_no, args.exp_us_phone_no)
             : undefined,

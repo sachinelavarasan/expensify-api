@@ -13,7 +13,6 @@ import {
 
 export const expensifyUsers = pgTable('exp_users', {
   exp_us_id: uuid('exp_us_id').primaryKey().defaultRandom(),
-  exp_us_clerk_id: varchar('exp_us_clerk_id', { length: 255 }).unique(),
   exp_us_name: text('exp_us_name'),
   exp_us_email: text('exp_us_email'),
   exp_us_phone_no: text('exp_phone_no'),

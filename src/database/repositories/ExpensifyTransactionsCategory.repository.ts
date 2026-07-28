@@ -33,7 +33,7 @@ export class ExpensifyTransactionsCategoryRepository {
   ) {
     let current = await this.getOne({ id: args.id });
 
-    if (!current) {
+    if (!current || current.exp_tc_user_id !== userId) {
       throw new NotFoundException(`Category with ID ${args.id} not found`);
     }
 
@@ -87,12 +87,17 @@ export class ExpensifyTransactionsCategoryRepository {
 
     return result;
   }
-  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[]) {
+  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[], userId: string) {
     const updates = categories.map((item, index) =>
       this.dbObject.db
         .update(expTransactionCategories)
         .set({ exp_tc_sort_order: index + 1 })
-        .where(and(eq(expTransactionCategories.exp_tc_id, item.exp_tc_id))),
+        .where(
+          and(
+            eq(expTransactionCategories.exp_tc_id, item.exp_tc_id),
+            eq(expTransactionCategories.exp_tc_user_id, userId),
+          ),
+        ),
     );
     await Promise.all(updates);
   }
@@ -126,7 +131,7 @@ export class ExpensifyTransactionsCategoryRepository {
   async deleteCategory(id: string, userId: string): Promise<void> {
     await this.dbObject.db.transaction(async (tx) => {
       const current = await this.getOne({ id });
-      if (!current) {
+      if (!current || current.exp_tc_user_id !== userId) {
         throw new NotFoundException(`Category with ID ${id} not found`);
       }
       const othersCategory = await tx

@@ -28,7 +28,16 @@ export class ExpensifyBankAccountRepository {
     const account = data as unknown as InsertExpensifyBankAccounts;
     return await this.dbObject.db.insert(expBankAccounts).values(account).returning();
   }
-  async updateBankAccount(data: Partial<InsertExpensifyBankAccounts>, id: string) {
+  async updateBankAccount(data: Partial<InsertExpensifyBankAccounts>, id: string, userId: string) {
+    const existing = await this.dbObject.db.query.expBankAccounts.findFirst({
+      where: (expBankAccounts, { eq, and }) =>
+        and(eq(expBankAccounts.exp_ba_id, id), eq(expBankAccounts.exp_ba_user_id, userId)),
+    });
+
+    if (!existing) {
+      throw new Error('Bank account not found');
+    }
+
     return await this.dbObject.db
       .update(expBankAccounts)
       .set(data)

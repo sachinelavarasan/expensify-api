@@ -52,11 +52,11 @@ export class ExpensifyAuthService {
     const payload = { exp_us_id: user.exp_us_id, email: user.exp_us_email };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.config.get('EXPENSIFY_JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get('EXPENSIFY_JWT_ACCESS_EXPIRY') || '15m',
+      expiresIn: this.config.get('EXPENSIFY_JWT_ACCESS_EXPIRY') || '7d',
     });
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret: this.config.get('EXPENSIFY_JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('EXPENSIFY_JWT_REFRESH_EXPIRY') || '30d',
+      expiresIn: this.config.get('EXPENSIFY_JWT_REFRESH_EXPIRY') || '90d',
     });
     return { accessToken, refreshToken };
   }
@@ -102,10 +102,12 @@ export class ExpensifyAuthService {
   async signup(dto: SignupDto) {
     const existing = await this.usersRepository.getOne({ email: dto.email });
     if (existing) {
-      throw new HttpException(
-        'An account with this email already exists, please log in',
-        HttpStatus.BAD_REQUEST,
-      );
+      // Same response as a fresh signup regardless of whether the account
+      // already exists, so this endpoint can't be used to enumerate emails.
+      if (!existing.exp_us_email_verified) {
+        await this.issueAndSendOtp(existing, 'signup_verify');
+      }
+      return { message: 'Verification code sent to your email' };
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -143,11 +145,12 @@ export class ExpensifyAuthService {
 
   async resendOtp(dto: ResendOtpDto) {
     const user = await this.usersRepository.getOne({ email: dto.email });
-    if (!user) {
-      throw new HttpException('Account not found', HttpStatus.BAD_REQUEST);
+    // Same response whether or not the account exists, so this endpoint
+    // can't be used to enumerate registered emails.
+    if (user) {
+      await this.issueAndSendOtp(user, dto.purpose);
     }
-    await this.issueAndSendOtp(user, dto.purpose);
-    return { message: 'Verification code sent to your email' };
+    return { message: 'If that email is registered, a verification code has been sent' };
   }
 
   async login(dto: LoginDto) {
@@ -177,11 +180,12 @@ export class ExpensifyAuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.usersRepository.getOne({ email: dto.email });
-    if (!user) {
-      throw new HttpException('Account not found', HttpStatus.BAD_REQUEST);
+    // Same response whether or not the account exists, so this endpoint
+    // can't be used to enumerate registered emails.
+    if (user) {
+      await this.issueAndSendOtp(user, 'password_reset');
     }
-    await this.issueAndSendOtp(user, 'password_reset');
-    return { message: 'Verification code sent to your email' };
+    return { message: 'If that email is registered, a verification code has been sent' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -218,7 +222,7 @@ export class ExpensifyAuthService {
       { exp_us_id: user.exp_us_id, email: user.exp_us_email },
       {
         secret: this.config.get('EXPENSIFY_JWT_ACCESS_SECRET'),
-        expiresIn: this.config.get('EXPENSIFY_JWT_ACCESS_EXPIRY') || '15m',
+        expiresIn: this.config.get('EXPENSIFY_JWT_ACCESS_EXPIRY') || '7d',
       },
     );
     return { accessToken };

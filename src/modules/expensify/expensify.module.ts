@@ -32,7 +32,6 @@ export class ExpensifyModule implements NestModule {
     consumer
       .apply(AuthExpensifyMiddleware)
       .exclude(
-        { path: 'expensify/clerk/webhook', method: RequestMethod.POST },
         { path: 'expensify/auth/signup', method: RequestMethod.POST },
         { path: 'expensify/auth/verify-signup-otp', method: RequestMethod.POST },
         { path: 'expensify/auth/resend-otp', method: RequestMethod.POST },

@@ -75,9 +75,9 @@ export class RecurringTransactionsRepository {
     return record;
   }
 
-  async update(id: string, dto: UpdateRecurringTransactionDto) {
+  async update(id: string, dto: UpdateRecurringTransactionDto, userId: string) {
     const current = await this.getOne(id);
-    if (!current) {
+    if (!current || current.exp_rt_user_id !== userId) {
       throw new NotFoundException(`Recurring transaction with ID ${id} not found`);
     }
     const data = dto as unknown as Partial<InsertExpensifyRecurringTransactions>;
@@ -89,7 +89,11 @@ export class RecurringTransactionsRepository {
     return record;
   }
 
-  async delete(id: string) {
+  async delete(id: string, userId: string) {
+    const current = await this.getOne(id);
+    if (!current || current.exp_rt_user_id !== userId) {
+      throw new NotFoundException(`Recurring transaction with ID ${id} not found`);
+    }
     await this.dbObject.db
       .delete(expRecurringTransactions)
       .where(eq(expRecurringTransactions.exp_rt_id, id));

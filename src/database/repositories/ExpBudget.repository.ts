@@ -23,18 +23,22 @@ export class ExpensifyBudgetRepository {
     return { message: 'Budget added' };
   }
 
-  async removeBudget(bgId: string) {
+  async removeBudget(bgId: string, userId: string) {
+    const current = await this.getOne(bgId);
+    if (!current || current.exp_bg_user_id !== userId) {
+      throw new NotFoundException(`Budget with ID ${bgId} not found`);
+    }
     await this.dbObject.db.delete(expBudgets).where(and(eq(expBudgets.exp_bg_id, bgId)));
     return { message: 'Budget removed' };
   }
 
-  async updateBudget(dto: UpdateBudgetDto, id: string) {
+  async updateBudget(dto: UpdateBudgetDto, id: string, userId: string) {
     const current = await this.getOne(id);
-    const data = dto as unknown as Partial<InsertExpensifyBudgets>;
 
-    if (!current) {
+    if (!current || current.exp_bg_user_id !== userId) {
       throw new NotFoundException(`Budget with ID ${id} not found`);
     }
+    const data = dto as unknown as Partial<InsertExpensifyBudgets>;
     await this.dbObject.db
       .update(expBudgets)
       .set(data)

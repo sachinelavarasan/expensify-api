@@ -13,4 +13,4 @@ jobs:
         env:
           CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
         run: |
-          curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://lendslog-api.vercel.app/crons/recurring-transactions"
+          curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/recurring-transactions"

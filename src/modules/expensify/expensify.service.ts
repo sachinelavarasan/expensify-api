@@ -7,7 +7,6 @@ import {
   CreateBudgetDto,
   CreateRecurringTransactionDto,
   CreateStarredTransactionDto,
-  ExpensifySignUpDto,
   TransactionDto,
   UpdateBudgetDto,
   UpdateRecurringTransactionDto,
@@ -42,61 +41,6 @@ export class ExpensifyService {
     private recurringTransactionsRepository: RecurringTransactionsRepository,
     private storageService: StorageService,
   ) {}
-
-  async signup(dto: ExpensifySignUpDto) {
-    const existUser = await this.usersRepository.getOne({ id: dto.id });
-
-    if (existUser) {
-      throw new HttpException('Your email already exists', HttpStatus.BAD_REQUEST);
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [data, ...other] = await this.usersRepository.createUser({
-        exp_us_name: dto.name,
-        exp_us_phone_no: dto.phone,
-        exp_us_email: dto.email,
-        exp_us_clerk_id: dto.id,
-      });
-      await this.expensifyBankAccountRepository.createBankAccount({
-        exp_ba_name: 'Main Account',
-        exp_ba_balance: '0',
-        exp_ba_user_id: data.exp_us_id,
-        exp_ba_icon: 'account-balance'
-      })
-      return true;
-    } catch (e) {
-      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  // edit profile
-  async editProfile(id: string, dto: ExpensifySignUpDto) {
-    try {
-      const existUser = await this.usersRepository.getOne({ id });
-      if (!existUser) {
-        throw new HttpException("Oops!, We can't find you in our database", HttpStatus.BAD_REQUEST);
-      }
-      let data = {};
-      if (dto.delete) {
-        data = {
-          exp_us_is_deleted: true,
-        };
-      } else {
-        data = {
-          exp_us_name: dto.name,
-          exp_us_phone_no: dto.phone,
-          exp_us_email: dto.email,
-        };
-      }
-      await this.usersRepository.updateUser(data, { exp_us_clerk_id: id });
-      const user = await this.usersRepository.getOne({ id });
-      return user;
-    } catch (e) {
-      console.log(e);
-      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
-    }
-  }
 
   async getAllTransactions(
     id: string,
@@ -163,14 +107,14 @@ export class ExpensifyService {
 
     return trend;
   }
-  async getTransaction(id: string) {
-    return await this.expensifyTransactionsRepository.getOne(id);
+  async getTransaction(id: string, userId: string) {
+    return await this.expensifyTransactionsRepository.getOne(id, userId);
   }
-  async deleteTransaction(id: string) {
-    return await this.expensifyTransactionsRepository.deleteTransaction(id);
+  async deleteTransaction(id: string, userId: string) {
+    return await this.expensifyTransactionsRepository.deleteTransaction(id, userId);
   }
-  async editTransaction(id: string, dto: TransactionDto) {
-    return await this.expensifyTransactionsRepository.updateTransaction(id, dto);
+  async editTransaction(id: string, dto: TransactionDto, userId: string) {
+    return await this.expensifyTransactionsRepository.updateTransaction(id, dto, userId);
   }
   async createTransaction(dto: TransactionDto) {
     const [account] = await this.expensifyBankAccountRepository.getAllBankAccount(
@@ -199,8 +143,8 @@ export class ExpensifyService {
       offset,
     );
   }
-  async updateAccount(id: string, dto: InsertExpensifyBankAccounts) {
-    return await this.expensifyBankAccountRepository.updateBankAccount(dto, id);
+  async updateAccount(id: string, dto: InsertExpensifyBankAccounts, userId: string) {
+    return await this.expensifyBankAccountRepository.updateBankAccount(dto, id, userId);
   }
   async removeAccount(id: string, userId: string) {
     return await this.expensifyBankAccountRepository.deleteBankAccount(id, userId);
@@ -218,8 +162,8 @@ export class ExpensifyService {
   async isTransactionStarred(userId: string, transactionId: string) {
     return await this.expStarredTransactionsRepository.isTransactionStarred(userId, transactionId);
   }
-  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[]) {
-    return await this.expensifyTransactionsCategoryRepository.reorderCategories(categories);
+  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[], userId: string) {
+    return await this.expensifyTransactionsCategoryRepository.reorderCategories(categories, userId);
   }
   async createCategory(dto: InsertExpensifyTransactionCategories, userId: string) {
     return await this.expensifyTransactionsCategoryRepository.createCategory(dto, userId);
@@ -354,12 +298,12 @@ export class ExpensifyService {
   async createBudget(dto: CreateBudgetDto) {
     return await this.expensifyBudgetRepository.addBudget(dto);
   }
-   async updateBudget(dto: UpdateBudgetDto, id: string) {
+   async updateBudget(dto: UpdateBudgetDto, id: string, userId: string) {
     return await this.expensifyBudgetRepository.updateBudget(dto,
-      id);
+      id, userId);
   }
-  async deleteBudget(id: string) {
-    return await this.expensifyBudgetRepository.removeBudget(id);
+  async deleteBudget(id: string, userId: string) {
+    return await this.expensifyBudgetRepository.removeBudget(id, userId);
   }
 
   async getRecurringTransactions(userId: string) {
@@ -369,11 +313,11 @@ export class ExpensifyService {
     dto.exp_rt_next_due_date = dto.exp_rt_start_date;
     return await this.recurringTransactionsRepository.create(dto);
   }
-  async updateRecurringTransaction(id: string, dto: UpdateRecurringTransactionDto) {
-    return await this.recurringTransactionsRepository.update(id, dto);
+  async updateRecurringTransaction(id: string, dto: UpdateRecurringTransactionDto, userId: string) {
+    return await this.recurringTransactionsRepository.update(id, dto, userId);
   }
-  async deleteRecurringTransaction(id: string) {
-    return await this.recurringTransactionsRepository.delete(id);
+  async deleteRecurringTransaction(id: string, userId: string) {
+    return await this.recurringTransactionsRepository.delete(id, userId);
   }
 
   async importRecurringTransactions(userId: string, recurringIds: string[]) {

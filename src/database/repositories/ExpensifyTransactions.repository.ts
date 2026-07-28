@@ -23,7 +23,7 @@ export class ExpensifyTransactionsRepository {
     private expStarredTransactionsRepository: ExpStarredTransactionsRepository,
   ) {}
 
-  async getOne(id: string) {
+  async getOne(id: string, userId: string) {
     return await this.dbObject.db
       .select({
         exp_ts_id: expTransactions.exp_ts_id,
@@ -57,7 +57,7 @@ export class ExpensifyTransactionsRepository {
         eq(expTransactions.exp_ts_id, expStarredTransactions.exp_st_transaction_id),
       )
       .orderBy(desc(expTransactions.exp_ts_date))
-      .where(eq(expTransactions.exp_ts_id, id))
+      .where(and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)))
       .limit(1);
   }
   async createTransaction(data: TransactionDto) {
@@ -151,12 +151,13 @@ export class ExpensifyTransactionsRepository {
 
     return true;
   }
-  async updateTransaction(id: string, data: TransactionDto) {
+  async updateTransaction(id: string, data: TransactionDto, userId: string) {
     const isStarred = data.exp_st_id;
     delete data.exp_st_id;
 
     const existingTransaction = await this.dbObject.db.query.expTransactions.findFirst({
-      where: (expTransactions, { eq }) => eq(expTransactions.exp_ts_id, id),
+      where: (expTransactions, { eq, and }) =>
+        and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)),
     });
 
     if (!existingTransaction) {
@@ -370,9 +371,10 @@ export class ExpensifyTransactionsRepository {
       .offset(offset);
   }
 
-  async deleteTransaction(id: string) {
+  async deleteTransaction(id: string, userId: string) {
     const existingTransaction = await this.dbObject.db.query.expTransactions.findFirst({
-      where: (expTransactions, { eq }) => eq(expTransactions.exp_ts_id, id),
+      where: (expTransactions, { eq, and }) =>
+        and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)),
     });
 
     if (!existingTransaction) {
