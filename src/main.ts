@@ -3,6 +3,7 @@ import { STATUS_CODES } from 'http';
 import { json, urlencoded } from 'express';
 import * as firebase from 'firebase-admin';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 
@@ -45,6 +46,16 @@ async function bootstrap() {
       stopAtFirstError: true,
     }),
   );
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Expensify API')
+    .setDescription('API documentation for the Expensify backend')
+    .setVersion('0.0.1')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
+
   await app.listen(+process.env.PORT || 3000, () => {
     console.log('Server is listening on port: ' + process.env.PORT);
   });
