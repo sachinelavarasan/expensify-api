@@ -14,14 +14,14 @@ export class CronjobsController {
   }
 
   @Get('recurring-transactions')
-  async runRecurringTransactionsCron(@Headers('x-cron-token') cronToken: string) {
+  runRecurringTransactionsCron(@Headers('x-cron-token') cronToken: string) {
     this.assertAuthorized(cronToken);
-    try {
-      console.log('********* Recurring Transaction Reminder Cron Initiated ********');
-      await this.cronjobsService.sendRecurringTransactionReminders();
-      console.log('********* Recurring Transaction Reminder Cron Completed ********');
-    } catch (error) {
-      console.error(error);
-    }
+    console.log('********* Recurring Transaction Reminder Cron Initiated ********');
+    this.cronjobsService
+      .sendRecurringTransactionReminders()
+      .then(() => console.log('********* Recurring Transaction Reminder Cron Completed ********'))
+      .catch((error) => console.error(error));
+
+    return { status: 'accepted' };
   }
 }

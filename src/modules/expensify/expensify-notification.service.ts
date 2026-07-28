@@ -20,33 +20,55 @@ export class ExpensifyNotificationService implements OnModuleInit {
     return this.expo;
   }
 
-  private async disableStaleTokens(tickets: ExpoPushTicket[]) {
-    for (const ticket of tickets) {
-      if (
-        ticket.status === 'error' &&
-        ticket.details?.error === 'DeviceNotRegistered' &&
-        ticket.details.expoPushToken
-      ) {
-        await this.notificationTokenRepository.disableByToken(ticket.details.expoPushToken);
+  private async disableStaleTokens(messages: ExpoPushMessage[], tickets: ExpoPushTicket[]) {
+    const tokenByReceiptId = new Map<string, string>();
+    tickets.forEach((ticket, index) => {
+      if (ticket.status === 'ok') {
+        tokenByReceiptId.set(ticket.id, messages[index].to as string);
+      }
+    });
+
+    if (!tokenByReceiptId.size) {
+      return;
+    }
+
+    const receiptIdChunks = this.expo.chunkPushNotificationReceiptIds(
+      Array.from(tokenByReceiptId.keys()),
+    );
+
+    for (const chunk of receiptIdChunks) {
+      try {
+        const receipts = await this.expo.getPushNotificationReceiptsAsync(chunk);
+        for (const receiptId in receipts) {
+          const receipt = receipts[receiptId];
+          if (receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
+            const token = tokenByReceiptId.get(receiptId);
+            if (token) {
+              await this.notificationTokenRepository.disableByToken(token);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching notification receipts', error);
       }
     }
   }
 
   async sendNotifications(messages: ExpoPushMessage[]) {
     const chunks = this.expo.chunkPushNotifications(messages);
-    const receipts: ExpoPushTicket[] = [];
+    const tickets: ExpoPushTicket[] = [];
 
     for (const chunk of chunks) {
       try {
         const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
-        receipts.push(...ticketChunk);
+        tickets.push(...ticketChunk);
       } catch (error) {
         console.error('Error sending notification chunk', error);
       }
     }
 
-    await this.disableStaleTokens(receipts);
+    await this.disableStaleTokens(messages, tickets);
 
-    return receipts;
+    return tickets;
   }
 }

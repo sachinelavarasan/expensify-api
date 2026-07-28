@@ -64,7 +64,13 @@ export class CronjobsService {
       console.log(`********* Removed ${removedTokens.length} stale notification tokens ********`);
 
       const today = moment().format('YYYY-MM-DD');
-      const activeRules = await this.recurringTransactionsRepository.getActiveRules(today);
+      const monthStart = moment().startOf('month').format('YYYY-MM-DD');
+      const monthEnd = moment().endOf('month').format('YYYY-MM-DD');
+      const activeRules = await this.recurringTransactionsRepository.getActiveRules(
+        today,
+        monthStart,
+        monthEnd,
+      );
 
       const rulesByUser = new Map<string, typeof activeRules>();
       for (const rule of activeRules) {
@@ -74,13 +80,13 @@ export class CronjobsService {
       }
 
       for (const [userId, rules] of Array.from(rulesByUser.entries())) {
-        const tokenEntry = await this.expensifyNotificationTokenRepository.getOne({
+        const tokenEntries = await this.expensifyNotificationTokenRepository.getMany({
           exp_ntto_user_id: userId,
         });
 
-        if (tokenEntry) {
+        if (tokenEntries.length) {
           const count = rules.length;
-          const message: ExpoPushMessage = {
+          const messages: ExpoPushMessage[] = tokenEntries.map((tokenEntry) => ({
             to: tokenEntry.exp_ntto_token,
             title: 'New month, new budget!',
             sound: 'default',
@@ -91,25 +97,26 @@ export class CronjobsService {
               count,
               recurringIds: rules.map((rule) => rule.exp_rt_id),
             },
-          };
-          await this.expensifyNotificationService.sendNotifications([message]);
+          }));
+
+          await this.expensifyNotificationService.sendNotifications(messages);
         }
 
-        for (const rule of rules) {
-          const nextDueDate = moment(rule.exp_rt_next_due_date)
-            .add(1, RECURRING_FREQUENCY_UNIT[rule.exp_rt_frequency])
-            .format('YYYY-MM-DD');
-          const isPastEndDate = rule.exp_rt_end_date && nextDueDate > rule.exp_rt_end_date;
+        // for (const rule of rules) {
+        //   const nextDueDate = moment(rule.exp_rt_next_due_date)
+        //     .add(1, RECURRING_FREQUENCY_UNIT[rule.exp_rt_frequency])
+        //     .format('YYYY-MM-DD');
+        //   const isPastEndDate = rule.exp_rt_end_date && nextDueDate > rule.exp_rt_end_date;
 
-          await this.recurringTransactionsRepository.update(
-            rule.exp_rt_id,
-            {
-              exp_rt_next_due_date: nextDueDate,
-              exp_rt_is_active: !isPastEndDate,
-            },
-            rule.exp_rt_user_id,
-          );
-        }
+        //   await this.recurringTransactionsRepository.update(
+        //     rule.exp_rt_id,
+        //     {
+        //       exp_rt_next_due_date: nextDueDate,
+        //       exp_rt_is_active: !isPastEndDate,
+        //     },
+        //     rule.exp_rt_user_id,
+        //   );
+        // }
       }
       console.log('********* Recurring Transaction Reminders Completed ********');
       return true;

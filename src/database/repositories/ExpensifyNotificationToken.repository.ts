@@ -71,4 +71,14 @@ export class ExpensifyNotificationTokenRepository {
       where: and(...conditions),
     });
   }
+
+  async getMany(args: Partial<SelectExpensifyNotificationToken>) {
+    const conditions = [];
+    Object.keys(args).map((item: keyof InsertExpensifyNotificationToken) => {
+      conditions.push(eq(expNotificationToken[item], args[item]));
+    });
+    return await this.dbObject.db.query.expNotificationToken.findMany({
+      where: and(...conditions),
+    });
+  }
 }
