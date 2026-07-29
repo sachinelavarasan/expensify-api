@@ -50,6 +50,10 @@ export class ExpensifyService {
       transaction_type?: number;
       transaction_label?: string;
       accountId?: string;
+      minAmount?: string;
+      maxAmount?: string;
+      categoryIds?: string[];
+      tags?: string[];
     },
   ) {
     return await this.expensifyTransactionsRepository.getAllTransactions(id, args);
@@ -112,6 +116,25 @@ export class ExpensifyService {
   }
   async deleteTransaction(id: string, userId: string) {
     return await this.expensifyTransactionsRepository.deleteTransaction(id, userId);
+  }
+  async bulkDeleteTransactions(ids: string[], userId: string) {
+    return await this.expensifyTransactionsRepository.bulkDeleteTransactions(ids, userId);
+  }
+  async bulkUpdateTransactions(
+    ids: string[],
+    patch: { exp_tc_id?: string; exp_ts_tags?: string[] },
+    userId: string,
+  ) {
+    return await this.expensifyTransactionsRepository.bulkUpdateTransactions(ids, patch, userId);
+  }
+  async restoreTransaction(id: string, userId: string) {
+    return await this.expensifyTransactionsRepository.restoreTransaction(id, userId);
+  }
+  async purgeTransaction(id: string, userId: string) {
+    return await this.expensifyTransactionsRepository.purgeTransaction(id, userId);
+  }
+  async getTrashedTransactions(userId: string) {
+    return await this.expensifyTransactionsRepository.getTrashedTransactions(userId);
   }
   async editTransaction(id: string, dto: TransactionDto, userId: string) {
     return await this.expensifyTransactionsRepository.updateTransaction(id, dto, userId);

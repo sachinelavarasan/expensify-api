@@ -55,13 +55,33 @@ export class ExpensifyController {
         user: { exp_us_id },
         query,
       } = req;
-      const { startDate, endDate, transaction_type, search, account } = query as {
+      const {
+        startDate,
+        endDate,
+        transaction_type,
+        search,
+        account,
+        minAmount,
+        maxAmount,
+        categories,
+        tags,
+      } = query as {
         startDate: string;
         endDate: string;
         transaction_type?: 'all' | 'income' | 'expense';
         search?: string;
         account: string;
+        minAmount?: string;
+        maxAmount?: string;
+        categories?: string;
+        tags?: string;
       };
+      const isValidAmount = (value?: string) => !value || /^\d+(\.\d+)?$/.test(value);
+      if (!isValidAmount(minAmount) || !isValidAmount(maxAmount)) {
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .json({ error: 'minAmount/maxAmount must be valid positive numbers' });
+      }
       const data = await this.expensifyService.getAllTransactions(exp_us_id, {
         startDate,
         endDate,
@@ -69,6 +89,10 @@ export class ExpensifyController {
           transaction_type === 'income' ? 2 : transaction_type === 'expense' ? 1 : undefined,
         transaction_label: search ? search : undefined,
         accountId: account ? account : undefined,
+        minAmount: minAmount ? minAmount : undefined,
+        maxAmount: maxAmount ? maxAmount : undefined,
+        categoryIds: categories ? categories.split(',') : undefined,
+        tags: tags ? tags.split(',') : undefined,
       });
       return res.status(200).json(data);
     } catch (error) {
@@ -188,6 +212,49 @@ export class ExpensifyController {
       user: { exp_us_id },
     } = req;
     return this.expensifyService.deleteTransaction(id, exp_us_id);
+  }
+
+  @Get('transactions/trash')
+  getTrashedTransactions(@Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.getTrashedTransactions(exp_us_id);
+  }
+
+  @Patch('transaction/:id/restore')
+  restoreTransaction(@Param('id') id: string, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.restoreTransaction(id, exp_us_id);
+  }
+
+  @Delete('transaction/:id/purge')
+  purgeTransaction(@Param('id') id: string, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.purgeTransaction(id, exp_us_id);
+  }
+
+  @Delete('transactions/bulk')
+  bulkDeleteTransactions(@Body() body: { ids: string[] }, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.bulkDeleteTransactions(body.ids, exp_us_id);
+  }
+
+  @Patch('transactions/bulk')
+  bulkUpdateTransactions(
+    @Body() body: { ids: string[]; patch: { exp_tc_id?: string; exp_ts_tags?: string[] } },
+    @Req() req: ExpressWithUser,
+  ) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.bulkUpdateTransactions(body.ids, body.patch, exp_us_id);
   }
 
   @Get('categories')

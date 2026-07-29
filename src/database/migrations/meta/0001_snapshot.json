@@ -1,0 +1,936 @@
+{
+  "id": "5cfd92fa-8443-453f-b08b-57e5be7c316a",
+  "prevId": "91f1d607-e716-463d-836d-ed4d493f5d69",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.exp_bank_accounts": {
+      "name": "exp_bank_accounts",
+      "schema": "",
+      "columns": {
+        "exp_ba_id": {
+          "name": "exp_ba_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_ba_user_id": {
+          "name": "exp_ba_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ba_name": {
+          "name": "exp_ba_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ba_balance": {
+          "name": "exp_ba_balance",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_ba_currency": {
+          "name": "exp_ba_currency",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'INR'"
+        },
+        "exp_ba_type": {
+          "name": "exp_ba_type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'bank'"
+        },
+        "exp_ba_icon": {
+          "name": "exp_ba_icon",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_ba_color": {
+          "name": "exp_ba_color",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_ba_is_primary": {
+          "name": "exp_ba_is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "exp_ba_is_active": {
+          "name": "exp_ba_is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "exp_ba_is_deleted": {
+          "name": "exp_ba_is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "exp_ba_created_at": {
+          "name": "exp_ba_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_ba_updated_at": {
+          "name": "exp_ba_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_bank_accounts_exp_ba_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_bank_accounts_exp_ba_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_bank_accounts",
+          "columnsFrom": [
+            "exp_ba_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_budgets": {
+      "name": "exp_budgets",
+      "schema": "",
+      "columns": {
+        "exp_bg_id": {
+          "name": "exp_bg_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_bg_user_id": {
+          "name": "exp_bg_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_bg_amount": {
+          "name": "exp_bg_amount",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_bg_category_id": {
+          "name": "exp_bg_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_bg_date": {
+          "name": "exp_bg_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_bg_created_at": {
+          "name": "exp_bg_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_bg_updated_at": {
+          "name": "exp_bg_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_budgets_exp_bg_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_budgets_exp_bg_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_budgets",
+          "columnsFrom": [
+            "exp_bg_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "exp_budgets_exp_bg_category_id_exp_transaction_categories_exp_tc_id_fk": {
+          "name": "exp_budgets_exp_bg_category_id_exp_transaction_categories_exp_tc_id_fk",
+          "tableFrom": "exp_budgets",
+          "columnsFrom": [
+            "exp_bg_category_id"
+          ],
+          "tableTo": "exp_transaction_categories",
+          "columnsTo": [
+            "exp_tc_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_notification_log": {
+      "name": "exp_notification_log",
+      "schema": "",
+      "columns": {
+        "exp_nl_id": {
+          "name": "exp_nl_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_nl_user_id": {
+          "name": "exp_nl_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
+        "exp_nl_status": {
+          "name": "exp_nl_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "exp_nl_created_at": {
+          "name": "exp_nl_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_nl_updated_at": {
+          "name": "exp_nl_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_nl_is_deleted": {
+          "name": "exp_nl_is_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "exp_nl_text": {
+          "name": "exp_nl_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
+        "exp_nl_pending_count": {
+          "name": "exp_nl_pending_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_notification_token": {
+      "name": "exp_notification_token",
+      "schema": "",
+      "columns": {
+        "exp_ntto_id": {
+          "name": "exp_ntto_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_ntto_user_id": {
+          "name": "exp_ntto_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ntto_token": {
+          "name": "exp_ntto_token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ntto_status": {
+          "name": "exp_ntto_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "exp_ntto_time": {
+          "name": "exp_ntto_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_ntto_created_at": {
+          "name": "exp_ntto_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_ntto_updated_at": {
+          "name": "exp_ntto_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_notification_token_exp_ntto_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_notification_token_exp_ntto_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_notification_token",
+          "columnsFrom": [
+            "exp_ntto_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_recurring_transactions": {
+      "name": "exp_recurring_transactions",
+      "schema": "",
+      "columns": {
+        "exp_rt_id": {
+          "name": "exp_rt_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_rt_user_id": {
+          "name": "exp_rt_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_title": {
+          "name": "exp_rt_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_amount": {
+          "name": "exp_rt_amount",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_note": {
+          "name": "exp_rt_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_rt_category_id": {
+          "name": "exp_rt_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_transaction_type_id": {
+          "name": "exp_rt_transaction_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_bank_account_id": {
+          "name": "exp_rt_bank_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
+        "exp_rt_frequency": {
+          "name": "exp_rt_frequency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_start_date": {
+          "name": "exp_rt_start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_end_date": {
+          "name": "exp_rt_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_rt_next_due_date": {
+          "name": "exp_rt_next_due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_rt_is_active": {
+          "name": "exp_rt_is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "exp_rt_created_at": {
+          "name": "exp_rt_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_rt_updated_at": {
+          "name": "exp_rt_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_recurring_transactions_exp_rt_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_recurring_transactions_exp_rt_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_recurring_transactions",
+          "columnsFrom": [
+            "exp_rt_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "exp_recurring_transactions_exp_rt_category_id_exp_transaction_categories_exp_tc_id_fk": {
+          "name": "exp_recurring_transactions_exp_rt_category_id_exp_transaction_categories_exp_tc_id_fk",
+          "tableFrom": "exp_recurring_transactions",
+          "columnsFrom": [
+            "exp_rt_category_id"
+          ],
+          "tableTo": "exp_transaction_categories",
+          "columnsTo": [
+            "exp_tc_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "exp_recurring_transactions_exp_rt_transaction_type_id_exp_transaction_types_exp_tt_id_fk": {
+          "name": "exp_recurring_transactions_exp_rt_transaction_type_id_exp_transaction_types_exp_tt_id_fk",
+          "tableFrom": "exp_recurring_transactions",
+          "columnsFrom": [
+            "exp_rt_transaction_type_id"
+          ],
+          "tableTo": "exp_transaction_types",
+          "columnsTo": [
+            "exp_tt_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "exp_recurring_transactions_exp_rt_bank_account_id_exp_bank_accounts_exp_ba_id_fk": {
+          "name": "exp_recurring_transactions_exp_rt_bank_account_id_exp_bank_accounts_exp_ba_id_fk",
+          "tableFrom": "exp_recurring_transactions",
+          "columnsFrom": [
+            "exp_rt_bank_account_id"
+          ],
+          "tableTo": "exp_bank_accounts",
+          "columnsTo": [
+            "exp_ba_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_starred_transactions": {
+      "name": "exp_starred_transactions",
+      "schema": "",
+      "columns": {
+        "exp_st_id": {
+          "name": "exp_st_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_st_user_id": {
+          "name": "exp_st_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_st_transaction_id": {
+          "name": "exp_st_transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_st_created_at": {
+          "name": "exp_st_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_starred_transactions_exp_st_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_starred_transactions_exp_st_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_starred_transactions",
+          "columnsFrom": [
+            "exp_st_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "exp_starred_transactions_exp_st_transaction_id_exp_transactions_exp_ts_id_fk": {
+          "name": "exp_starred_transactions_exp_st_transaction_id_exp_transactions_exp_ts_id_fk",
+          "tableFrom": "exp_starred_transactions",
+          "columnsFrom": [
+            "exp_st_transaction_id"
+          ],
+          "tableTo": "exp_transactions",
+          "columnsTo": [
+            "exp_ts_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_transaction_categories": {
+      "name": "exp_transaction_categories",
+      "schema": "",
+      "columns": {
+        "exp_tc_id": {
+          "name": "exp_tc_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_tc_label": {
+          "name": "exp_tc_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_tc_icon": {
+          "name": "exp_tc_icon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_tc_user_id": {
+          "name": "exp_tc_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_tc_icon_bg_color": {
+          "name": "exp_tc_icon_bg_color",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_tc_transaction_type": {
+          "name": "exp_tc_transaction_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_tc_created_at": {
+          "name": "exp_tc_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_tc_updated_at": {
+          "name": "exp_tc_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_tc_sort_order": {
+          "name": "exp_tc_sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_transaction_categories_exp_tc_transaction_type_exp_transaction_types_exp_tt_id_fk": {
+          "name": "exp_transaction_categories_exp_tc_transaction_type_exp_transaction_types_exp_tt_id_fk",
+          "tableFrom": "exp_transaction_categories",
+          "columnsFrom": [
+            "exp_tc_transaction_type"
+          ],
+          "tableTo": "exp_transaction_types",
+          "columnsTo": [
+            "exp_tt_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_transaction_types": {
+      "name": "exp_transaction_types",
+      "schema": "",
+      "columns": {
+        "exp_tt_id": {
+          "name": "exp_tt_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "exp_tt_label": {
+          "name": "exp_tt_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_transactions": {
+      "name": "exp_transactions",
+      "schema": "",
+      "columns": {
+        "exp_ts_id": {
+          "name": "exp_ts_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_ts_user_id": {
+          "name": "exp_ts_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_title": {
+          "name": "exp_ts_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_amount": {
+          "name": "exp_ts_amount",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_date": {
+          "name": "exp_ts_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_time": {
+          "name": "exp_ts_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_note": {
+          "name": "exp_ts_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_ts_transaction_type": {
+          "name": "exp_ts_transaction_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_category": {
+          "name": "exp_ts_category",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp_ts_created_at": {
+          "name": "exp_ts_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_ts_bank_account_id": {
+          "name": "exp_ts_bank_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
+        "exp_ts_updated_at": {
+          "name": "exp_ts_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exp_transactions_exp_ts_user_id_exp_users_exp_us_id_fk": {
+          "name": "exp_transactions_exp_ts_user_id_exp_users_exp_us_id_fk",
+          "tableFrom": "exp_transactions",
+          "columnsFrom": [
+            "exp_ts_user_id"
+          ],
+          "tableTo": "exp_users",
+          "columnsTo": [
+            "exp_us_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "exp_transactions_exp_ts_transaction_type_exp_transaction_types_exp_tt_id_fk": {
+          "name": "exp_transactions_exp_ts_transaction_type_exp_transaction_types_exp_tt_id_fk",
+          "tableFrom": "exp_transactions",
+          "columnsFrom": [
+            "exp_ts_transaction_type"
+          ],
+          "tableTo": "exp_transaction_types",
+          "columnsTo": [
+            "exp_tt_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "exp_transactions_exp_ts_category_exp_transaction_categories_exp_tc_id_fk": {
+          "name": "exp_transactions_exp_ts_category_exp_transaction_categories_exp_tc_id_fk",
+          "tableFrom": "exp_transactions",
+          "columnsFrom": [
+            "exp_ts_category"
+          ],
+          "tableTo": "exp_transaction_categories",
+          "columnsTo": [
+            "exp_tc_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "exp_transactions_exp_ts_bank_account_id_exp_bank_accounts_exp_ba_id_fk": {
+          "name": "exp_transactions_exp_ts_bank_account_id_exp_bank_accounts_exp_ba_id_fk",
+          "tableFrom": "exp_transactions",
+          "columnsFrom": [
+            "exp_ts_bank_account_id"
+          ],
+          "tableTo": "exp_bank_accounts",
+          "columnsTo": [
+            "exp_ba_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.exp_users": {
+      "name": "exp_users",
+      "schema": "",
+      "columns": {
+        "exp_us_id": {
+          "name": "exp_us_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "exp_us_clerk_id": {
+          "name": "exp_us_clerk_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_name": {
+          "name": "exp_us_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_email": {
+          "name": "exp_us_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_phone_no": {
+          "name": "exp_phone_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_is_deleted": {
+          "name": "exp_us_is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "exp_us_currency": {
+          "name": "exp_us_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
+        "exp_us_default_transaction": {
+          "name": "exp_us_default_transaction",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
+        "exp_us_default_grouping": {
+          "name": "exp_us_default_grouping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'month'"
+        },
+        "exp_us_profile_url": {
+          "name": "exp_us_profile_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_password_hash": {
+          "name": "exp_us_password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_email_verified": {
+          "name": "exp_us_email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "exp_us_otp_code_hash": {
+          "name": "exp_us_otp_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_otp_purpose": {
+          "name": "exp_us_otp_purpose",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_otp_expires_at": {
+          "name": "exp_us_otp_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exp_us_otp_attempts": {
+          "name": "exp_us_otp_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "exp_us_created_at": {
+          "name": "exp_us_created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "exp_us_updated_at": {
+          "name": "exp_us_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "exp_users_exp_us_clerk_id_unique": {
+          "name": "exp_users_exp_us_clerk_id_unique",
+          "columns": [
+            "exp_us_clerk_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      }
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

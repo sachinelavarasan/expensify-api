@@ -24,4 +24,16 @@ export class CronjobsController {
 
     return { status: 'accepted' };
   }
+
+  @Get('purge-trash')
+  runPurgeTrashCron(@Headers('x-cron-token') cronToken: string) {
+    this.assertAuthorized(cronToken);
+    console.log('********* Purge Trash Cron Initiated ********');
+    this.cronjobsService
+      .purgeTrashedTransactions()
+      .then(() => console.log('********* Purge Trash Cron Completed ********'))
+      .catch((error) => console.error(error));
+
+    return { status: 'accepted' };
+  }
 }

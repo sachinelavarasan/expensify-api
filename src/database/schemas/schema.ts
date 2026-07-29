@@ -98,6 +98,12 @@ export const expTransactions = pgTable('exp_transactions', {
     .default(null),
 
   exp_ts_updated_at: timestamp('exp_ts_updated_at', { mode: 'string' }).$onUpdate(() => sql`now()`),
+
+  exp_ts_deleted_at: timestamp('exp_ts_deleted_at', { mode: 'string' }).default(null),
+
+  exp_ts_tags: text('exp_ts_tags')
+    .array()
+    .default(sql`'{}'::text[]`),
 });
 
 export type InsertExpensifyTransactions = InferInsertModel<typeof expTransactions>;

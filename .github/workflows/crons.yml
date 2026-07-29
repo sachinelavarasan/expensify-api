@@ -2,7 +2,7 @@ name: Scheduled Jobs
 
 on:
   schedule:
-    - cron: '0 0 1 * *' # monthly recurring-transactions reminder + stale-token cleanup
+    - cron: '0 0 1 * *' # monthly recurring-transactions reminder + stale-token cleanup + trash purge
   workflow_dispatch: {}
 
 jobs:
@@ -14,3 +14,8 @@ jobs:
           CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
         run: |
           curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
+      - name: Trigger purge-trash cron
+        env:
+          CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
+        run: |
+          curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/purge-trash"

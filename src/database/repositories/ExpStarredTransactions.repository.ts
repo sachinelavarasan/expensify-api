@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
 import {
@@ -97,7 +97,12 @@ export class ExpStarredTransactionsRepository {
         expTransactionTypes,
         eq(expTransactions.exp_ts_transaction_type, expTransactionTypes.exp_tt_id),
       )
-      .where(eq(expStarredTransactions.exp_st_user_id, userId));
+      .where(
+        and(
+          eq(expStarredTransactions.exp_st_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      );
   }
 
   async isTransactionStarred(userId: string, transactionId: string) {

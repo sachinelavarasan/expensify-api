@@ -4,6 +4,7 @@ import moment from 'moment';
 
 import { ExpensifyNotificationTokenRepository } from 'src/database/repositories/ExpensifyNotificationToken.repository';
 import { RecurringTransactionsRepository } from 'src/database/repositories/RecurringTransactions.repository';
+import { ExpensifyTransactionsRepository } from 'src/database/repositories/ExpensifyTransactions.repository';
 import { ExpensifyNotificationService } from 'src/modules/expensify/expensify-notification.service';
 
 const RECURRING_FREQUENCY_UNIT: Record<string, moment.unitOfTime.DurationConstructor> = {
@@ -19,6 +20,7 @@ export class CronjobsService {
     private expensifyNotificationTokenRepository: ExpensifyNotificationTokenRepository,
     private expensifyNotificationService: ExpensifyNotificationService,
     private recurringTransactionsRepository: RecurringTransactionsRepository,
+    private expensifyTransactionsRepository: ExpensifyTransactionsRepository,
   ) {}
 
   async expensifySendNotification() {
@@ -119,6 +121,19 @@ export class CronjobsService {
         }
       }
       console.log('********* Recurring Transaction Reminders Completed ********');
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async purgeTrashedTransactions() {
+    try {
+      console.log('********* Purge Trashed Transactions Initiated ********');
+      const purgedCount = await this.expensifyTransactionsRepository.purgeExpiredTrash(30);
+      console.log(
+        `********* Purge Trashed Transactions Completed (${purgedCount} purged) ********`,
+      );
       return true;
     } catch (error) {
       throw error;

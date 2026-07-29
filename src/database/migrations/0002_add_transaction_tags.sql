@@ -1,0 +1,1 @@
+ALTER TABLE "exp_transactions" ADD COLUMN IF NOT EXISTS "exp_ts_tags" text[] DEFAULT '{}';

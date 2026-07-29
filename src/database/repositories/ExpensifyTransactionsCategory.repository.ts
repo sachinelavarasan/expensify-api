@@ -80,14 +80,20 @@ export class ExpensifyTransactionsCategoryRepository {
       .from(expTransactionCategories)
       .leftJoin(
         expTransactions,
-        eq(expTransactionCategories.exp_tc_id, expTransactions.exp_ts_category),
+        and(
+          eq(expTransactionCategories.exp_tc_id, expTransactions.exp_ts_category),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
       )
       .where(or(...conditions))
       .groupBy(expTransactionCategories.exp_tc_id);
 
     return result;
   }
-  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[], userId: string) {
+  async reorderCategories(
+    categories: Partial<SelectExpensifyTransactionCategories>[],
+    userId: string,
+  ) {
     const updates = categories.map((item, index) =>
       this.dbObject.db
         .update(expTransactionCategories)

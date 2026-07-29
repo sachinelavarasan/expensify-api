@@ -102,11 +102,13 @@ export class ExpensifyAuthService {
   async signup(dto: SignupDto) {
     const existing = await this.usersRepository.getOne({ email: dto.email });
     if (existing) {
-      // Same response as a fresh signup regardless of whether the account
-      // already exists, so this endpoint can't be used to enumerate emails.
-      if (!existing.exp_us_email_verified) {
-        await this.issueAndSendOtp(existing, 'signup_verify');
+      if (existing.exp_us_email_verified) {
+        throw new HttpException(
+          'An account with this email already exists',
+          HttpStatus.CONFLICT,
+        );
       }
+      await this.issueAndSendOtp(existing, 'signup_verify');
       return { message: 'Verification code sent to your email' };
     }
 
@@ -133,11 +135,11 @@ export class ExpensifyAuthService {
     if (!user) {
       throw new HttpException('Account not found', HttpStatus.BAD_REQUEST);
     }
+    await this.verifyOtp(user, 'signup_verify', dto.code);
     if (!user.exp_us_email_verified) {
-      await this.verifyOtp(user, 'signup_verify', dto.code);
       await this.usersRepository.markEmailVerified(user.exp_us_id);
-      await this.usersRepository.clearOtp(user.exp_us_id);
     }
+    await this.usersRepository.clearOtp(user.exp_us_id);
     const verifiedUser = await this.usersRepository.getOne({ email: dto.email });
     const tokens = await this.issueTokens(verifiedUser);
     return { ...tokens, user: this.sanitizeUser(verifiedUser) };
@@ -180,12 +182,11 @@ export class ExpensifyAuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.usersRepository.getOne({ email: dto.email });
-    // Same response whether or not the account exists, so this endpoint
-    // can't be used to enumerate registered emails.
-    if (user) {
-      await this.issueAndSendOtp(user, 'password_reset');
+    if (!user) {
+      throw new HttpException('No account found with this email', HttpStatus.BAD_REQUEST);
     }
-    return { message: 'If that email is registered, a verification code has been sent' };
+    await this.issueAndSendOtp(user, 'password_reset');
+    return { message: 'Verification code sent to your email' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class TransactionDto {
   @IsString()
@@ -32,6 +32,11 @@ export class TransactionDto {
   @IsOptional()
   @IsString()
   exp_ts_note?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  exp_ts_tags?: string[];
 
   exp_ts_user_id: string;
   exp_st_id: boolean;

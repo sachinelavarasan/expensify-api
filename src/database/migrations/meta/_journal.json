@@ -8,6 +8,27 @@
       "when": 1785248398237,
       "tag": "0000_tired_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785340560906,
+      "tag": "0001_add_transaction_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785348942154,
+      "tag": "0002_add_transaction_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785360030887,
+      "tag": "0003_lethal_black_cat",
+      "breakpoints": true
     }
   ]
 }
