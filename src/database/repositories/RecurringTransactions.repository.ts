@@ -14,7 +14,7 @@ import {
 import {
   CreateRecurringTransactionDto,
   UpdateRecurringTransactionDto,
-} from 'src/modules/expensify/dto/auth.dto';
+} from '../../modules/expensify/dto/auth.dto';
 
 export class RecurringTransactionsRepository {
   constructor(

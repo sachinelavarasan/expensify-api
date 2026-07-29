@@ -11,22 +11,22 @@ import {
   UpdateBudgetDto,
   UpdateRecurringTransactionDto,
 } from './dto/auth.dto';
-import { ExpensifyUserRepository } from 'src/database/repositories/ExpensifyUser.repository';
-import { ExpensifyTransactionsRepository } from 'src/database/repositories/ExpensifyTransactions.repository';
-import { ExpensifyTransactionsCategoryRepository } from 'src/database/repositories/ExpensifyTransactionsCategory.repository';
+import { ExpensifyUserRepository } from '../../database/repositories/ExpensifyUser.repository';
+import { ExpensifyTransactionsRepository } from '../../database/repositories/ExpensifyTransactions.repository';
+import { ExpensifyTransactionsCategoryRepository } from '../../database/repositories/ExpensifyTransactionsCategory.repository';
 import {
   InsertExpensifyBankAccounts,
   InsertExpensifyTransactionCategories,
   InsertExpensifyTransactions,
   SelectExpensifyTransactionCategories,
   SelectExpensifyUser,
-} from 'src/database/schemas/schema';
-import { ExpensifyBankAccountRepository } from 'src/database/repositories/ExpensifyBankAccounts.repository';
-import { ExpStarredTransactionsRepository } from 'src/database/repositories/ExpStarredTransactions.repository';
-import { ExpensifyNotificationTokenRepository } from 'src/database/repositories/ExpensifyNotificationToken.repository';
-import { ExpensifyBudgetRepository } from 'src/database/repositories/ExpBudget.repository';
-import { RecurringTransactionsRepository } from 'src/database/repositories/RecurringTransactions.repository';
-import { StorageService } from 'src/storage/storage.service';
+} from '../../database/schemas/schema';
+import { ExpensifyBankAccountRepository } from '../../database/repositories/ExpensifyBankAccounts.repository';
+import { ExpStarredTransactionsRepository } from '../../database/repositories/ExpStarredTransactions.repository';
+import { ExpensifyNotificationTokenRepository } from '../../database/repositories/ExpensifyNotificationToken.repository';
+import { ExpensifyBudgetRepository } from '../../database/repositories/ExpBudget.repository';
+import { RecurringTransactionsRepository } from '../../database/repositories/RecurringTransactions.repository';
+import { StorageService } from '../../storage/storage.service';
 
 @Injectable()
 export class ExpensifyService {

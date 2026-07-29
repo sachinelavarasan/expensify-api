@@ -1,7 +1,7 @@
 import { Controller, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
 
 import { CronjobsService } from './cronjobs.service';
-import { secureCompare } from 'src/common/secure-compare';
+import { secureCompare } from '../common/secure-compare';
 
 @Controller('crons')
 export class CronjobsController {

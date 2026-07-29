@@ -3,12 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
-import { ExpensifyUserRepository } from 'src/database/repositories/ExpensifyUser.repository';
-import { ExpensifyBankAccountRepository } from 'src/database/repositories/ExpensifyBankAccounts.repository';
-import { SelectExpensifyUser } from 'src/database/schemas/schema';
+import { ExpensifyUserRepository } from '../../../database/repositories/ExpensifyUser.repository';
+import { ExpensifyBankAccountRepository } from '../../../database/repositories/ExpensifyBankAccounts.repository';
+import { SelectExpensifyUser } from '../../../database/schemas/schema';
 
-import { MailService } from 'src/mail/mail.service';
-import { OtpEmailPurpose } from 'src/mail/templates/otp-email.template';
+import { MailService } from '../../../mail/mail.service';
+import { OtpEmailPurpose } from '../../../mail/templates/otp-email.template';
 
 import {
   ForgotPasswordDto,

@@ -24,7 +24,7 @@ import {
   InsertExpensifyTransactionCategories,
   InsertExpensifyTransactions,
   SelectExpensifyTransactionCategories,
-} from 'src/database/schemas/schema';
+} from '../../database/schemas/schema';
 import {
   CreateBankAccountDto,
   CreateBudgetDto,

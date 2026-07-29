@@ -9,7 +9,7 @@ import {
   expTransactionTypes,
   expBankAccounts,
 } from '../schemas/schema';
-import { CreateStarredTransactionDto } from 'src/modules/expensify/dto/auth.dto';
+import { CreateStarredTransactionDto } from '../../modules/expensify/dto/auth.dto';
 
 @Injectable()
 export class ExpStarredTransactionsRepository {

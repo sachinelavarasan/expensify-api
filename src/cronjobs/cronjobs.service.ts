@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ExpoPushMessage } from 'expo-server-sdk';
 import moment from 'moment';
 
-import { ExpensifyNotificationTokenRepository } from 'src/database/repositories/ExpensifyNotificationToken.repository';
-import { RecurringTransactionsRepository } from 'src/database/repositories/RecurringTransactions.repository';
-import { ExpensifyTransactionsRepository } from 'src/database/repositories/ExpensifyTransactions.repository';
-import { ExpensifyNotificationService } from 'src/modules/expensify/expensify-notification.service';
+import { ExpensifyNotificationTokenRepository } from '../database/repositories/ExpensifyNotificationToken.repository';
+import { RecurringTransactionsRepository } from '../database/repositories/RecurringTransactions.repository';
+import { ExpensifyTransactionsRepository } from '../database/repositories/ExpensifyTransactions.repository';
+import { ExpensifyNotificationService } from '../modules/expensify/expensify-notification.service';
 
 const RECURRING_FREQUENCY_UNIT: Record<string, moment.unitOfTime.DurationConstructor> = {
   daily: 'day',

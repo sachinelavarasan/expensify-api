@@ -26,9 +26,9 @@ import {
   expTransactionTypes,
   InsertExpensifyTransactions,
 } from '../schemas/schema';
-import { TransactionDto } from 'src/modules/expensify/dto/auth.dto';
+import { TransactionDto } from '../../modules/expensify/dto/auth.dto';
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
-import { normalizeTransactionTitle } from 'src/common/utils/normalize-title.util';
+import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
 export class ExpensifyTransactionsRepository {
   constructor(

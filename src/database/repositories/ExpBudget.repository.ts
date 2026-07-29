@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
 import { expBudgets, InsertExpensifyBudgets } from '../schemas/schema';
-import { CreateBudgetDto, UpdateBudgetDto } from 'src/modules/expensify/dto/auth.dto';
+import { CreateBudgetDto, UpdateBudgetDto } from '../../modules/expensify/dto/auth.dto';
 
 @Injectable()
 export class ExpensifyBudgetRepository {

@@ -10,7 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
 import { ExpensifyService } from '../expensify.service';
-import { ExpensifyUserRepository } from 'src/database/repositories/ExpensifyUser.repository';
+import { ExpensifyUserRepository } from '../../../database/repositories/ExpensifyUser.repository';
 
 @Injectable()
 export class AuthExpensifyMiddleware implements NestMiddleware {
