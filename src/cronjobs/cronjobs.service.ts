@@ -102,21 +102,21 @@ export class CronjobsService {
           await this.expensifyNotificationService.sendNotifications(messages);
         }
 
-        // for (const rule of rules) {
-        //   const nextDueDate = moment(rule.exp_rt_next_due_date)
-        //     .add(1, RECURRING_FREQUENCY_UNIT[rule.exp_rt_frequency])
-        //     .format('YYYY-MM-DD');
-        //   const isPastEndDate = rule.exp_rt_end_date && nextDueDate > rule.exp_rt_end_date;
+        for (const rule of rules) {
+          const nextDueDate = moment(rule.exp_rt_next_due_date)
+            .add(1, RECURRING_FREQUENCY_UNIT[rule.exp_rt_frequency])
+            .format('YYYY-MM-DD');
+          const isPastEndDate = rule.exp_rt_end_date && nextDueDate > rule.exp_rt_end_date;
 
-        //   await this.recurringTransactionsRepository.update(
-        //     rule.exp_rt_id,
-        //     {
-        //       exp_rt_next_due_date: nextDueDate,
-        //       exp_rt_is_active: !isPastEndDate,
-        //     },
-        //     rule.exp_rt_user_id,
-        //   );
-        // }
+          await this.recurringTransactionsRepository.update(
+            rule.exp_rt_id,
+            {
+              exp_rt_next_due_date: nextDueDate,
+              exp_rt_is_active: !isPastEndDate,
+            },
+            rule.exp_rt_user_id,
+          );
+        }
       }
       console.log('********* Recurring Transaction Reminders Completed ********');
       return true;
