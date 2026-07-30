@@ -6,6 +6,7 @@ import { ExpensifyNotificationTokenRepository } from '../database/repositories/E
 import { RecurringTransactionsRepository } from '../database/repositories/RecurringTransactions.repository';
 import { ExpensifyTransactionsRepository } from '../database/repositories/ExpensifyTransactions.repository';
 import { ExpensifyNotificationService } from '../modules/expensify/expensify-notification.service';
+import { StorageService } from '../storage/storage.service';
 
 const RECURRING_FREQUENCY_UNIT: Record<string, moment.unitOfTime.DurationConstructor> = {
   daily: 'day',
@@ -21,6 +22,7 @@ export class CronjobsService {
     private expensifyNotificationService: ExpensifyNotificationService,
     private recurringTransactionsRepository: RecurringTransactionsRepository,
     private expensifyTransactionsRepository: ExpensifyTransactionsRepository,
+    private storageService: StorageService,
   ) {}
 
   async expensifySendNotification() {
@@ -130,9 +132,21 @@ export class CronjobsService {
   async purgeTrashedTransactions() {
     try {
       console.log('********* Purge Trashed Transactions Initiated ********');
-      const purgedCount = await this.expensifyTransactionsRepository.purgeExpiredTrash(30);
+      const purged = await this.expensifyTransactionsRepository.purgeExpiredTrash(30);
+
+      const attachmentUrls = purged
+        .map((row) => row.exp_ts_attachment_url)
+        .filter((url): url is string => !!url);
+      await Promise.all(
+        attachmentUrls.map((url) =>
+          this.storageService.deleteTransactionAttachment(url).catch((err) => {
+            console.log('Failed to delete purged transaction attachment', url, err);
+          }),
+        ),
+      );
+
       console.log(
-        `********* Purge Trashed Transactions Completed (${purgedCount} purged) ********`,
+        `********* Purge Trashed Transactions Completed (${purged.length} purged, ${attachmentUrls.length} attachments cleaned up) ********`,
       );
       return true;
     } catch (error) {

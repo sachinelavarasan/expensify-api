@@ -29,10 +29,12 @@ export class AuthExpensifyMiddleware implements NestMiddleware {
     }
 
     const user = await this.tryOwnJwt(bearerToken);
+    // console.log(user);
 
     if (!user) {
       throw new UnauthorizedException('Invalid session');
     }
+
     if (user.exp_us_is_deleted) {
       throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
     }

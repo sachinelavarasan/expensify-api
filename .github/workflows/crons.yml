@@ -2,7 +2,8 @@ name: Scheduled Jobs
 
 on:
   schedule:
-    - cron: '0 0 1 * *' # monthly recurring-transactions reminder + stale-token cleanup + trash purge
+    - cron: '0 10 2 * *' # recurring-transactions reminder + stale-token cleanup (10:00 UTC on the 2nd of each month)
+    - cron: '0 8 1 * *'  # trash purge (08:00 UTC on the 1st of each month)
   workflow_dispatch: {}
 
 jobs:
@@ -10,11 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger recurring-transactions cron
+        if: github.event_name != 'schedule' || github.event.schedule == '0 10 2 * *'
         env:
           CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
         run: |
           curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
       - name: Trigger purge-trash cron
+        if: github.event_name != 'schedule' || github.event.schedule == '0 8 1 * *'
         env:
           CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
         run: |

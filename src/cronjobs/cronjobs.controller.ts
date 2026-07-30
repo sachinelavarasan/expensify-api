@@ -22,7 +22,7 @@ export class CronjobsController {
       .then(() => console.log('********* Recurring Transaction Reminder Cron Completed ********'))
       .catch((error) => console.error(error));
 
-    return { status: 'accepted' };
+    return { success: true };
   }
 
   @Get('purge-trash')
@@ -34,6 +34,6 @@ export class CronjobsController {
       .then(() => console.log('********* Purge Trash Cron Completed ********'))
       .catch((error) => console.error(error));
 
-    return { status: 'accepted' };
+    return { success: true };
   }
 }

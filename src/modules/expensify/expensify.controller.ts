@@ -28,17 +28,21 @@ import {
 import {
   CreateBankAccountDto,
   CreateBudgetDto,
+  CreateDebtDto,
   CreateRecurringTransactionDto,
+  CreateRepaymentDto,
   CreateStarredTransactionDto,
   ImportRecurringTransactionsDto,
   TransactionDto,
   UpdateBankAccountDto,
   UpdateBudgetDto,
+  UpdateDebtDto,
   UpdateRecurringTransactionDto,
 } from './dto/auth.dto';
 import * as ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import moment from 'moment';
+import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
 @Controller('expensify')
 export class ExpensifyController {
@@ -162,6 +166,43 @@ export class ExpensifyController {
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: error.message });
+    }
+  }
+  @Post('transaction/attachment')
+  async uploadTransactionAttachment(
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+    @Body() body: { fileBase64: string },
+  ) {
+    try {
+      if (!body.fileBase64) {
+        return res.status(400).json({ error: 'fileBase64 is required' });
+      }
+      const url = await this.expensifyService.uploadTransactionAttachment(
+        req.user.exp_us_id,
+        body.fileBase64,
+      );
+      return res.status(200).json({ url });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+  @Delete('transaction/attachment')
+  async removeTransactionAttachment(
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+    @Body() body: { url: string },
+  ) {
+    try {
+      if (!body.url) {
+        return res.status(400).json({ error: 'url is required' });
+      }
+      await this.expensifyService.removeTransactionAttachment(body.url);
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
     }
   }
   @Get('transaction/:id')
@@ -709,7 +750,11 @@ export class ExpensifyController {
     }
   }
   @Post('import-data')
-  async importExcel(@Body() body: { headers: string[]; data: any }, @Res() res: Express.Response) {
+  async importExcel(
+    @Req() req: ExpressWithUser,
+    @Body() body: { headers: string[]; data: any },
+    @Res() res: Express.Response,
+  ) {
     const { headers, data } = body;
 
     if (!headers || !data || !Array.isArray(data))
@@ -720,6 +765,11 @@ export class ExpensifyController {
     );
 
     if (!isValid) return res.status(400).json({ error: 'Required parameters missing' });
+
+    const [expenseCategory, incomeCategory] = await Promise.all([
+      this.expensifyService.getDefaultCategory(1),
+      this.expensifyService.getDefaultCategory(2),
+    ]);
 
     const processed = data.map((row, idx) => {
       const errors: string[] = [];
@@ -764,16 +814,13 @@ export class ExpensifyController {
         errors.length === 0 &&
         validTypes.includes(row[headers['transaction_type']]?.toLowerCase())
       ) {
-        category_id = row[headers['transaction_type']]
-          ? row[headers['transaction_type']]?.toLowerCase() === 'income'
-            ? 12
-            : 6
-          : null;
-        transaction_id = row[headers['transaction_type']]
-          ? row[headers['transaction_type']]?.toLowerCase() === 'income'
-            ? 2
-            : 1
-          : null;
+        const isIncome = row[headers['transaction_type']]?.toLowerCase() === 'income';
+        const defaultCategory = isIncome ? incomeCategory : expenseCategory;
+        if (!defaultCategory) {
+          errors.push('No default category configured for this transaction type');
+        }
+        category_id = defaultCategory?.exp_tc_id ?? null;
+        transaction_id = isIncome ? 2 : 1;
       }
 
       const note = row['note'] || '';
@@ -802,12 +849,88 @@ export class ExpensifyController {
       .map((r) => ({ ...r, errors: '' }));
     // console.log(validRows);
 
+    const dupCandidates = validRows.map((r) => ({
+      dupDate: moment(r.date, 'DD/MM/YYYY HH:mm').format('YYYY-MM-DD'),
+      dupTitle: normalizeTransactionTitle(r.title),
+    }));
+
+    const existingTransactions = await this.expensifyService.findPotentialDuplicates(
+      req.user.exp_us_id,
+      dupCandidates.map((c) => c.dupDate),
+    );
+
+    type DuplicateRow = typeof validRows[number] & {
+      possibleDuplicate: true;
+      matchedTransaction: {
+        exp_ts_id: string;
+        exp_ts_title: string;
+        exp_ts_amount: string;
+        exp_ts_date: string;
+      } | null;
+      matchedStagedRow: { row: number } | null;
+    };
+
+    const possibleDuplicates: DuplicateRow[] = [];
+    // Rows with no match against existing DB transactions yet - still need to be
+    // checked against each other in case the file itself contains repeated rows.
+    const remainingRows: { row: typeof validRows[number]; dupDate: string; dupTitle: string }[] = [];
+
+    validRows.forEach((row, idx) => {
+      const { dupDate, dupTitle } = dupCandidates[idx];
+      const match = existingTransactions.find(
+        (tx) =>
+          tx.exp_ts_date === dupDate &&
+          Number(tx.exp_ts_amount) === Number(row.amount) &&
+          normalizeTransactionTitle(tx.exp_ts_title) === dupTitle,
+      );
+
+      if (match) {
+        possibleDuplicates.push({
+          ...row,
+          possibleDuplicate: true,
+          matchedTransaction: {
+            exp_ts_id: match.exp_ts_id,
+            exp_ts_title: match.exp_ts_title,
+            exp_ts_amount: match.exp_ts_amount,
+            exp_ts_date: match.exp_ts_date,
+          },
+          matchedStagedRow: null,
+        });
+      } else {
+        remainingRows.push({ row, dupDate, dupTitle });
+      }
+    });
+
+    // Intra-file check: rows that share the same date + amount + normalized title as
+    // an earlier row in this same import are flagged too, keeping only the first
+    // occurrence clean.
+    const cleanValidRows: typeof validRows = [];
+    const seenKeys = new Map<string, number>();
+
+    remainingRows.forEach(({ row, dupDate, dupTitle }) => {
+      const key = `${dupDate}|${dupTitle}|${Number(row.amount)}`;
+      const firstOccurrenceRow = seenKeys.get(key);
+
+      if (firstOccurrenceRow === undefined) {
+        seenKeys.set(key, row.row);
+        cleanValidRows.push(row);
+      } else {
+        possibleDuplicates.push({
+          ...row,
+          possibleDuplicate: true,
+          matchedTransaction: null,
+          matchedStagedRow: { row: firstOccurrenceRow },
+        });
+      }
+    });
+
     res.status(200).json({
       message: 'Excel processed successfully',
       headers,
       totalRows: data.length,
-      validRows,
+      validRows: cleanValidRows,
       invalidRows,
+      possibleDuplicates,
     });
   }
   @Post('bulk-transactions')
@@ -996,6 +1119,132 @@ export class ExpensifyController {
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  @Get('debts')
+  async getDebts(@Req() req: ExpressWithUser, @Res() res: Express.Response) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.getAllDebts(exp_us_id);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  @Get('debts/:id')
+  async getDebt(
+    @Param('id') id: string,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.getDebt(id, exp_us_id);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  @Post('debts')
+  async createDebt(
+    @Body() dto: CreateDebtDto,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      dto.exp_dt_user_id = exp_us_id;
+      const data = await this.expensifyService.createDebt(dto);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  @Put('debts/:id')
+  async updateDebt(
+    @Body() dto: UpdateDebtDto,
+    @Param('id') id: string,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.updateDebt(dto, id, exp_us_id);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  @Delete('debts/:id')
+  async deleteDebt(
+    @Param('id') id: string,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.deleteDebt(id, exp_us_id);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  @Post('debts/:id/repayments')
+  async addDebtRepayment(
+    @Body() dto: CreateRepaymentDto,
+    @Param('id') id: string,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.addDebtRepayment(id, exp_us_id, dto);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  @Delete('debts/:id/repayments/:repaymentId')
+  async deleteDebtRepayment(
+    @Param('id') id: string,
+    @Param('repaymentId') repaymentId: string,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const data = await this.expensifyService.deleteDebtRepayment(repaymentId, id, exp_us_id);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
     }
   }
 }

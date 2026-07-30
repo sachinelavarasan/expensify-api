@@ -25,6 +25,7 @@ import {
   expTransactions,
   expTransactionTypes,
   InsertExpensifyTransactions,
+  SelectExpensifyTransactions,
 } from '../schemas/schema';
 import { TransactionDto } from '../../modules/expensify/dto/auth.dto';
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
@@ -47,6 +48,7 @@ export class ExpensifyTransactionsRepository {
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
         exp_ts_tags: expTransactions.exp_ts_tags,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_created_at: expTransactions.exp_ts_created_at,
         exp_ts_updated_at: expTransactions.exp_ts_updated_at,
         exp_ts_category: expTransactionCategories.exp_tc_label,
@@ -344,6 +346,7 @@ export class ExpensifyTransactionsRepository {
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
         exp_ts_tags: expTransactions.exp_ts_tags,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_category: expTransactionCategories.exp_tc_label,
         exp_ts_transaction_type: expTransactionTypes.exp_tt_label,
         exp_tc_id: expTransactionCategories.exp_tc_id,
@@ -370,6 +373,24 @@ export class ExpensifyTransactionsRepository {
       .where(and(...conditions));
   }
 
+  // Candidate lookup for import duplicate-detection: narrows to the user's
+  // non-deleted transactions on any of the staged rows' dates, letting the
+  // caller do the final amount/title match in JS (exp_ts_amount is stored as
+  // text with inconsistent formatting, so exact-match there is unreliable).
+  async findByUserAndDates(userId: string, dates: string[]): Promise<SelectExpensifyTransactions[]> {
+    if (!dates.length) return [];
+    return await this.dbObject.db
+      .select()
+      .from(expTransactions)
+      .where(
+        and(
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+          inArray(expTransactions.exp_ts_date, [...new Set(dates)]),
+        ),
+      );
+  }
+
   // Dedicated paginated query for a single account's transaction history (used by
   // the account detail screen's infinite scroll) - kept separate from
   // getAllTransactions above so that method's unpaginated callers are unaffected.
@@ -387,6 +408,7 @@ export class ExpensifyTransactionsRepository {
         exp_ts_note: expTransactions.exp_ts_note,
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_category: expTransactionCategories.exp_tc_label,
         exp_ts_transaction_type: expTransactionTypes.exp_tt_label,
         exp_tc_id: expTransactionCategories.exp_tc_id,
@@ -617,7 +639,7 @@ export class ExpensifyTransactionsRepository {
 
     await this.dbObject.db.delete(expTransactions).where(eq(expTransactions.exp_ts_id, id));
 
-    return true;
+    return { attachmentUrl: existingTransaction.exp_ts_attachment_url };
   }
 
   async getTrashedTransactions(userId: string) {
@@ -673,9 +695,12 @@ export class ExpensifyTransactionsRepository {
           lt(expTransactions.exp_ts_deleted_at, cutoff.toISOString()),
         ),
       )
-      .returning({ exp_ts_id: expTransactions.exp_ts_id });
+      .returning({
+        exp_ts_id: expTransactions.exp_ts_id,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
+      });
 
-    return purged.length;
+    return purged;
   }
   async getAllTransactionsByCategory(
     userId: string,

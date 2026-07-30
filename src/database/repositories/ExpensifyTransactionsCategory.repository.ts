@@ -67,6 +67,22 @@ export class ExpensifyTransactionsCategoryRepository {
     return true;
   }
 
+  async getDefaultCategory(transactionType: number) {
+    const [category] = await this.dbObject.db
+      .select()
+      .from(expTransactionCategories)
+      .where(
+        and(
+          eq(expTransactionCategories.exp_tc_label, 'Others'),
+          isNull(expTransactionCategories.exp_tc_user_id),
+          eq(expTransactionCategories.exp_tc_transaction_type, transactionType),
+        ),
+      )
+      .limit(1);
+
+    return category ?? null;
+  }
+
   async getAllCategories(id: string) {
     const conditions = [
       eq(expTransactionCategories.exp_tc_user_id, id),

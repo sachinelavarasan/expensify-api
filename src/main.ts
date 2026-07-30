@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { STATUS_CODES } from 'http';
 import { json, urlencoded } from 'express';
-import * as firebase from 'firebase-admin';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -10,19 +9,6 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Separate Firebase project used for profile image storage.
-  if (process.env.FIREBASE_STORAGE_SERVICE_ACCOUNT_KEY) {
-    const storageServiceAccount = JSON.parse(
-      process.env.FIREBASE_STORAGE_SERVICE_ACCOUNT_KEY as string,
-    );
-    firebase.initializeApp(
-      {
-        credential: firebase.credential.cert(storageServiceAccount),
-        storageBucket: (process.env.FIREBASE_STORAGE_BUCKET || '').replace(/^gs:\/\//, ''),
-      },
-      'storage',
-    );
-  }
   app.enableCors({
     origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
