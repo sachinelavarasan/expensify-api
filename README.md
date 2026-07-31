@@ -35,6 +35,7 @@ cp .env.example .env
 | `EXPENSIFY_EXPO_PUSH_NOTIFICATION_ACCESS_TOKEN` | Expo push notifications |
 | `CRON_SECRET_TOKEN` | Auth token for external callers (e.g. GitHub Actions) hitting `/crons/*` |
 | `NOTIFICATION_TEST_TOKEN` | Auth token for the dev-only `/notifications/test-send` route |
+| `BACKUP_ADMIN_TOKEN` | Auth token for the admin-only `/backup/export` and `/backup/import` routes |
 
 Run database migrations, then start the server:
 
@@ -59,6 +60,7 @@ Interactive Swagger UI is served at **`/api/docs`** (raw OpenAPI JSON at `/api/d
 - `src/notification/` — push notifications (Expo Server SDK)
 - `src/cronjobs/` — scheduled jobs (e.g. recurring transactions)
 - `src/storage/` — Firebase-backed file storage (profile images)
+- `src/backup/` — admin-only manual backup/restore (`/backup/export`, `/backup/import`), no mobile UI
 - `src/common/` — shared middleware, guards, etc.
 
 ## 🧪 Scripts
