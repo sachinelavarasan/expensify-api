@@ -1,5 +1,18 @@
 import { Inject } from '@nestjs/common';
-import { and, desc, eq, gte, ilike, isNull, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
@@ -12,9 +25,11 @@ import {
   expTransactions,
   expTransactionTypes,
   InsertExpensifyTransactions,
+  SelectExpensifyTransactions,
 } from '../schemas/schema';
-import { TransactionDto } from 'src/modules/expensify/dto/auth.dto';
+import { TransactionDto } from '../../modules/expensify/dto/auth.dto';
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
+import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
 export class ExpensifyTransactionsRepository {
   constructor(
@@ -32,6 +47,8 @@ export class ExpensifyTransactionsRepository {
         exp_ts_note: expTransactions.exp_ts_note,
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
+        exp_ts_tags: expTransactions.exp_ts_tags,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_created_at: expTransactions.exp_ts_created_at,
         exp_ts_updated_at: expTransactions.exp_ts_updated_at,
         exp_ts_category: expTransactionCategories.exp_tc_label,
@@ -57,7 +74,13 @@ export class ExpensifyTransactionsRepository {
         eq(expTransactions.exp_ts_id, expStarredTransactions.exp_st_transaction_id),
       )
       .orderBy(desc(expTransactions.exp_ts_date))
-      .where(and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)))
+      .where(
+        and(
+          eq(expTransactions.exp_ts_id, id),
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      )
       .limit(1);
   }
   async createTransaction(data: TransactionDto) {
@@ -105,6 +128,9 @@ export class ExpensifyTransactionsRepository {
       .where(eq(expBankAccounts.exp_ba_id, selectedAcc.exp_ba_id));
 
     // Step 5: Insert the transaction record
+    if (data.exp_ts_title) {
+      data.exp_ts_title = normalizeTransactionTitle(data.exp_ts_title);
+    }
     const transaction = data as unknown as InsertExpensifyTransactions;
     const [row] = await this.dbObject.db.insert(expTransactions).values(transaction).returning();
 
@@ -140,8 +166,13 @@ export class ExpensifyTransactionsRepository {
 
     const newBalance = (currentBalance + totalTransactionAmount).toFixed(2);
 
+    const normalizedTransactions = transactions.map((t) => ({
+      ...t,
+      exp_ts_title: t.exp_ts_title ? normalizeTransactionTitle(t.exp_ts_title) : t.exp_ts_title,
+    }));
+
     await this.dbObject.db.transaction(async (tx) => {
-      await tx.insert(expTransactions).values(transactions).returning();
+      await tx.insert(expTransactions).values(normalizedTransactions).returning();
       await tx
         .update(expBankAccounts)
         .set({ exp_ba_balance: newBalance })
@@ -269,9 +300,16 @@ export class ExpensifyTransactionsRepository {
       accountId?: string;
       transaction_type?: number;
       transaction_label?: string;
+      minAmount?: string;
+      maxAmount?: string;
+      categoryIds?: string[];
+      tags?: string[];
     },
   ) {
-    const conditions = [eq(expTransactions.exp_ts_user_id, userId)];
+    const conditions = [
+      eq(expTransactions.exp_ts_user_id, userId),
+      isNull(expTransactions.exp_ts_deleted_at),
+    ];
     if (args.startDate && args.endDate) {
       conditions.push(
         gte(expTransactions.exp_ts_date, args.startDate),
@@ -287,6 +325,18 @@ export class ExpensifyTransactionsRepository {
     if (args.transaction_label) {
       conditions.push(ilike(expTransactions.exp_ts_title, `%${args.transaction_label}%`));
     }
+    if (args.minAmount) {
+      conditions.push(gte(sql`${expTransactions.exp_ts_amount}::numeric`, args.minAmount));
+    }
+    if (args.maxAmount) {
+      conditions.push(lte(sql`${expTransactions.exp_ts_amount}::numeric`, args.maxAmount));
+    }
+    if (args.categoryIds?.length) {
+      conditions.push(inArray(expTransactions.exp_ts_category, args.categoryIds));
+    }
+    if (args.tags?.length) {
+      conditions.push(sql`${expTransactions.exp_ts_tags} && ${args.tags}`);
+    }
     return await this.dbObject.db
       .select({
         exp_ts_id: expTransactions.exp_ts_id,
@@ -295,6 +345,8 @@ export class ExpensifyTransactionsRepository {
         exp_ts_note: expTransactions.exp_ts_note,
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
+        exp_ts_tags: expTransactions.exp_ts_tags,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_category: expTransactionCategories.exp_tc_label,
         exp_ts_transaction_type: expTransactionTypes.exp_tt_label,
         exp_tc_id: expTransactionCategories.exp_tc_id,
@@ -321,6 +373,24 @@ export class ExpensifyTransactionsRepository {
       .where(and(...conditions));
   }
 
+  // Candidate lookup for import duplicate-detection: narrows to the user's
+  // non-deleted transactions on any of the staged rows' dates, letting the
+  // caller do the final amount/title match in JS (exp_ts_amount is stored as
+  // text with inconsistent formatting, so exact-match there is unreliable).
+  async findByUserAndDates(userId: string, dates: string[]): Promise<SelectExpensifyTransactions[]> {
+    if (!dates.length) return [];
+    return await this.dbObject.db
+      .select()
+      .from(expTransactions)
+      .where(
+        and(
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+          inArray(expTransactions.exp_ts_date, [...new Set(dates)]),
+        ),
+      );
+  }
+
   // Dedicated paginated query for a single account's transaction history (used by
   // the account detail screen's infinite scroll) - kept separate from
   // getAllTransactions above so that method's unpaginated callers are unaffected.
@@ -338,6 +408,7 @@ export class ExpensifyTransactionsRepository {
         exp_ts_note: expTransactions.exp_ts_note,
         exp_ts_time: expTransactions.exp_ts_time,
         exp_ts_amount: expTransactions.exp_ts_amount,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
         exp_ts_category: expTransactionCategories.exp_tc_label,
         exp_ts_transaction_type: expTransactionTypes.exp_tt_label,
         exp_tc_id: expTransactionCategories.exp_tc_id,
@@ -364,6 +435,7 @@ export class ExpensifyTransactionsRepository {
         and(
           eq(expTransactions.exp_ts_user_id, userId),
           eq(expTransactions.exp_ts_bank_account_id, accountId),
+          isNull(expTransactions.exp_ts_deleted_at),
         ),
       )
       .orderBy(desc(expTransactions.exp_ts_date), desc(expTransactions.exp_ts_created_at))
@@ -401,7 +473,11 @@ export class ExpensifyTransactionsRepository {
       : currentBalance - transactionAmount;
 
     await this.dbObject.db.transaction(async (tx) => {
-      await tx.delete(expTransactions).where(eq(expTransactions.exp_ts_id, id)).returning();
+      await tx
+        .update(expTransactions)
+        .set({ exp_ts_deleted_at: new Date().toISOString() })
+        .where(eq(expTransactions.exp_ts_id, id))
+        .returning();
 
       await tx
         .update(expBankAccounts)
@@ -414,6 +490,218 @@ export class ExpensifyTransactionsRepository {
 
     return true;
   }
+
+  // Reuses deleteTransaction's exact per-row soft-delete + balance-adjust logic,
+  // but inlined inside one shared db.transaction so the whole batch is atomic
+  // (calling deleteTransaction in a loop would open/commit N separate transactions).
+  // Rows that are missing, already trashed, or on an inactive account are skipped
+  // rather than aborting the whole batch over one stale id.
+  async bulkDeleteTransactions(ids: string[], userId: string) {
+    if (!ids.length) return true;
+
+    await this.dbObject.db.transaction(async (tx) => {
+      for (const id of ids) {
+        const existingTransaction = await tx.query.expTransactions.findFirst({
+          where: (expTransactions, { eq, and }) =>
+            and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)),
+        });
+
+        if (!existingTransaction || existingTransaction.exp_ts_deleted_at) {
+          continue;
+        }
+
+        const accountId = existingTransaction.exp_ts_bank_account_id;
+
+        const account = await tx.query.expBankAccounts.findFirst({
+          where: (expBankAccounts, { eq }) =>
+            and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
+        });
+
+        if (!account) {
+          continue;
+        }
+
+        const currentBalance = parseFloat(account.exp_ba_balance);
+        const isExpense = existingTransaction.exp_ts_transaction_type === 1;
+        const transactionAmount = parseFloat(existingTransaction.exp_ts_amount);
+
+        const updatedBalance = isExpense
+          ? currentBalance + transactionAmount
+          : currentBalance - transactionAmount;
+
+        await tx
+          .update(expTransactions)
+          .set({ exp_ts_deleted_at: new Date().toISOString() })
+          .where(eq(expTransactions.exp_ts_id, id));
+
+        await tx
+          .update(expBankAccounts)
+          .set({ exp_ba_balance: updatedBalance.toFixed(2) })
+          .where(eq(expBankAccounts.exp_ba_id, accountId));
+      }
+    });
+
+    return true;
+  }
+
+  // Scoped to category + tags only - neither affects account balance, so a plain
+  // batched UPDATE is safe (unlike bulk-delete, no need to re-derive the balance
+  // math per row).
+  async bulkUpdateTransactions(
+    ids: string[],
+    patch: { exp_tc_id?: string; exp_ts_tags?: string[] },
+    userId: string,
+  ) {
+    if (!ids.length) return true;
+
+    const updateSet: Partial<InsertExpensifyTransactions> = {};
+    if (patch.exp_tc_id) updateSet.exp_ts_category = patch.exp_tc_id;
+    if (patch.exp_ts_tags) updateSet.exp_ts_tags = patch.exp_ts_tags;
+
+    if (!Object.keys(updateSet).length) return true;
+
+    await this.dbObject.db
+      .update(expTransactions)
+      .set(updateSet)
+      .where(
+        and(
+          inArray(expTransactions.exp_ts_id, ids),
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      );
+
+    return true;
+  }
+
+  async restoreTransaction(id: string, userId: string) {
+    const existingTransaction = await this.dbObject.db.query.expTransactions.findFirst({
+      where: (expTransactions, { eq, and }) =>
+        and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)),
+    });
+
+    if (!existingTransaction) {
+      throw new Error('Transaction not found');
+    }
+
+    if (!existingTransaction.exp_ts_deleted_at) {
+      throw new Error('Transaction is not in trash');
+    }
+
+    const accountId = existingTransaction.exp_ts_bank_account_id;
+
+    const account = await this.dbObject.db.query.expBankAccounts.findFirst({
+      where: (expBankAccounts, { eq }) =>
+        and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
+    });
+
+    if (!account) {
+      throw new Error('Bank account not found or inactive');
+    }
+
+    const currentBalance = parseFloat(account.exp_ba_balance);
+    const isExpense = existingTransaction.exp_ts_transaction_type === 1;
+    const transactionAmount = parseFloat(existingTransaction.exp_ts_amount);
+
+    // Inverse of deleteTransaction's adjustment above
+    const updatedBalance = isExpense
+      ? currentBalance - transactionAmount
+      : currentBalance + transactionAmount;
+
+    await this.dbObject.db.transaction(async (tx) => {
+      await tx
+        .update(expTransactions)
+        .set({ exp_ts_deleted_at: null })
+        .where(eq(expTransactions.exp_ts_id, id))
+        .returning();
+
+      await tx
+        .update(expBankAccounts)
+        .set({
+          exp_ba_balance: updatedBalance.toFixed(2),
+        })
+        .where(eq(expBankAccounts.exp_ba_id, accountId))
+        .returning();
+    });
+
+    return true;
+  }
+
+  async purgeTransaction(id: string, userId: string) {
+    const existingTransaction = await this.dbObject.db.query.expTransactions.findFirst({
+      where: (expTransactions, { eq, and }) =>
+        and(eq(expTransactions.exp_ts_id, id), eq(expTransactions.exp_ts_user_id, userId)),
+    });
+
+    if (!existingTransaction) {
+      throw new Error('Transaction not found');
+    }
+
+    await this.dbObject.db.delete(expTransactions).where(eq(expTransactions.exp_ts_id, id));
+
+    return { attachmentUrl: existingTransaction.exp_ts_attachment_url };
+  }
+
+  async getTrashedTransactions(userId: string) {
+    return await this.dbObject.db
+      .select({
+        exp_ts_id: expTransactions.exp_ts_id,
+        exp_ts_title: expTransactions.exp_ts_title,
+        exp_ts_date: expTransactions.exp_ts_date,
+        exp_ts_note: expTransactions.exp_ts_note,
+        exp_ts_time: expTransactions.exp_ts_time,
+        exp_ts_amount: expTransactions.exp_ts_amount,
+        exp_ts_deleted_at: expTransactions.exp_ts_deleted_at,
+        exp_ts_category: expTransactionCategories.exp_tc_label,
+        exp_ts_transaction_type: expTransactionTypes.exp_tt_label,
+        exp_tc_id: expTransactionCategories.exp_tc_id,
+        exp_tc_icon: expTransactionCategories.exp_tc_icon,
+        exp_tc_icon_bg_color: expTransactionCategories.exp_tc_icon_bg_color,
+        exp_tt_id: expTransactionTypes.exp_tt_id,
+        exp_ba_id: expBankAccounts.exp_ba_id,
+        exp_ba_name: expBankAccounts.exp_ba_name,
+      })
+      .from(expTransactions)
+      .innerJoin(
+        expTransactionTypes,
+        eq(expTransactions.exp_ts_transaction_type, expTransactionTypes.exp_tt_id),
+      )
+      .innerJoin(
+        expBankAccounts,
+        eq(expTransactions.exp_ts_bank_account_id, expBankAccounts.exp_ba_id),
+      )
+      .innerJoin(
+        expTransactionCategories,
+        eq(expTransactions.exp_ts_category, expTransactionCategories.exp_tc_id),
+      )
+      .where(
+        and(
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNotNull(expTransactions.exp_ts_deleted_at),
+        ),
+      )
+      .orderBy(desc(expTransactions.exp_ts_deleted_at));
+  }
+
+  async purgeExpiredTrash(olderThanDays = 30) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - olderThanDays);
+
+    const purged = await this.dbObject.db
+      .delete(expTransactions)
+      .where(
+        and(
+          isNotNull(expTransactions.exp_ts_deleted_at),
+          lt(expTransactions.exp_ts_deleted_at, cutoff.toISOString()),
+        ),
+      )
+      .returning({
+        exp_ts_id: expTransactions.exp_ts_id,
+        exp_ts_attachment_url: expTransactions.exp_ts_attachment_url,
+      });
+
+    return purged;
+  }
   async getAllTransactionsByCategory(
     userId: string,
     args: {
@@ -423,7 +711,10 @@ export class ExpensifyTransactionsRepository {
       transaction_type?: number;
     },
   ) {
-    const conditions = [eq(expTransactions.exp_ts_user_id, userId)];
+    const conditions = [
+      eq(expTransactions.exp_ts_user_id, userId),
+      isNull(expTransactions.exp_ts_deleted_at),
+    ];
     if (args.startDate && args.endDate) {
       conditions.push(
         gte(expTransactions.exp_ts_date, args.startDate),
@@ -569,7 +860,7 @@ export class ExpensifyTransactionsRepository {
         SUM(exp_ts_amount::numeric) FILTER (WHERE exp_ts_transaction_type = 2) as income,
         SUM(exp_ts_amount::numeric) FILTER (WHERE exp_ts_transaction_type = 1) as expense
       FROM exp_transactions
-      WHERE exp_ts_user_id = ${userId} AND exp_ts_date >= ${startDate}
+      WHERE exp_ts_user_id = ${userId} AND exp_ts_date >= ${startDate} AND exp_ts_deleted_at IS NULL
       GROUP BY month
       ORDER BY month
     `);
@@ -591,6 +882,7 @@ export class ExpensifyTransactionsRepository {
         AND exp_ts_category = ${categoryId}
         AND exp_ts_transaction_type = 1
         AND exp_ts_date >= ${startDate}
+        AND exp_ts_deleted_at IS NULL
       GROUP BY month
       ORDER BY month
     `);

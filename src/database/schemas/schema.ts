@@ -98,6 +98,14 @@ export const expTransactions = pgTable('exp_transactions', {
     .default(null),
 
   exp_ts_updated_at: timestamp('exp_ts_updated_at', { mode: 'string' }).$onUpdate(() => sql`now()`),
+
+  exp_ts_deleted_at: timestamp('exp_ts_deleted_at', { mode: 'string' }).default(null),
+
+  exp_ts_tags: text('exp_ts_tags')
+    .array()
+    .default(sql`'{}'::text[]`),
+
+  exp_ts_attachment_url: text('exp_ts_attachment_url'),
 });
 
 export type InsertExpensifyTransactions = InferInsertModel<typeof expTransactions>;
@@ -255,3 +263,39 @@ export type InsertExpensifyRecurringTransactions = InferInsertModel<
 export type SelectExpensifyRecurringTransactions = InferSelectModel<
   typeof expRecurringTransactions
 >;
+
+export const expDebts = pgTable('exp_debts', {
+  exp_dt_id: uuid('exp_dt_id').primaryKey().defaultRandom(),
+  exp_dt_user_id: uuid('exp_dt_user_id')
+    .notNull()
+    .references(() => expensifyUsers.exp_us_id, { onDelete: 'cascade' }),
+  exp_dt_person_name: text('exp_dt_person_name').notNull(),
+  exp_dt_direction: text('exp_dt_direction').notNull(),
+  exp_dt_amount: text('exp_dt_amount').notNull(),
+  exp_dt_due_date: date('exp_dt_due_date'),
+  exp_dt_note: text('exp_dt_note'),
+  exp_dt_created_at: timestamp('exp_dt_created_at', { mode: 'string' })
+    .notNull()
+    .default(sql`now()`),
+  exp_dt_updated_at: timestamp('exp_dt_updated_at', { mode: 'string' }).$onUpdate(() => sql`now()`),
+  exp_dt_deleted_at: timestamp('exp_dt_deleted_at', { mode: 'string' }).default(null),
+});
+
+export type InsertExpensifyDebts = InferInsertModel<typeof expDebts>;
+export type SelectExpensifyDebts = InferSelectModel<typeof expDebts>;
+
+export const expDebtRepayments = pgTable('exp_debt_repayments', {
+  exp_dr_id: uuid('exp_dr_id').primaryKey().defaultRandom(),
+  exp_dr_debt_id: uuid('exp_dr_debt_id')
+    .notNull()
+    .references(() => expDebts.exp_dt_id, { onDelete: 'cascade' }),
+  exp_dr_amount: text('exp_dr_amount').notNull(),
+  exp_dr_date: date('exp_dr_date').notNull(),
+  exp_dr_note: text('exp_dr_note'),
+  exp_dr_created_at: timestamp('exp_dr_created_at', { mode: 'string' })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export type InsertExpensifyDebtRepayments = InferInsertModel<typeof expDebtRepayments>;
+export type SelectExpensifyDebtRepayments = InferSelectModel<typeof expDebtRepayments>;

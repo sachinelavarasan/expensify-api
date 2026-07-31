@@ -8,6 +8,48 @@
       "when": 1785248398237,
       "tag": "0000_tired_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785340560906,
+      "tag": "0001_add_transaction_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785348942154,
+      "tag": "0002_add_transaction_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785360030887,
+      "tag": "0003_lethal_black_cat",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785415929042,
+      "tag": "0004_add_transaction_dup_check_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785427295931,
+      "tag": "0005_add_transaction_attachment",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785427315410,
+      "tag": "0006_add_debts_and_repayments",
+      "breakpoints": true
     }
   ]
 }

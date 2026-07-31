@@ -1,7 +1,7 @@
 import { Controller, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
 
 import { CronjobsService } from './cronjobs.service';
-import { secureCompare } from 'src/common/secure-compare';
+import { secureCompare } from '../common/secure-compare';
 
 @Controller('crons')
 export class CronjobsController {
@@ -22,6 +22,18 @@ export class CronjobsController {
       .then(() => console.log('********* Recurring Transaction Reminder Cron Completed ********'))
       .catch((error) => console.error(error));
 
-    return { status: 'accepted' };
+    return { success: true };
+  }
+
+  @Get('purge-trash')
+  runPurgeTrashCron(@Headers('x-cron-token') cronToken: string) {
+    this.assertAuthorized(cronToken);
+    console.log('********* Purge Trash Cron Initiated ********');
+    this.cronjobsService
+      .purgeTrashedTransactions()
+      .then(() => console.log('********* Purge Trash Cron Completed ********'))
+      .catch((error) => console.error(error));
+
+    return { success: true };
   }
 }

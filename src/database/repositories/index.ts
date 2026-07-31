@@ -7,6 +7,7 @@ import { ExpensifyTransactionsCategoryRepository } from './ExpensifyTransactions
 import { ExpensifyUserRepository } from './ExpensifyUser.repository';
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
 import { RecurringTransactionsRepository } from './RecurringTransactions.repository';
+import { DebtsRepository } from './Debts.repository';
 
 export const repositories = [
   ExpensifyUserRepository,
@@ -18,4 +19,5 @@ export const repositories = [
   ExpensifyNotificationLogRepository,
   ExpensifyBudgetRepository,
   RecurringTransactionsRepository,
+  DebtsRepository,
 ];

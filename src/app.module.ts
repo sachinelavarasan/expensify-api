@@ -9,6 +9,7 @@ import { CommonModule } from './common/common.module';
 import { CronjobsModule } from './cronjobs/cronjobs.module';
 import { ExpensifyModule } from './modules/expensify/expensify.module';
 import { NotificationModule } from './notification/notification.module';
+import { BackupModule } from './backup/backup.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -30,6 +31,7 @@ import { AppService } from './app.service';
     CronjobsModule,
     ExpensifyModule,
     NotificationModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [

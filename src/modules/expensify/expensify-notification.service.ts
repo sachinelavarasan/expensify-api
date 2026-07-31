@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 
-import { ExpensifyNotificationTokenRepository } from 'src/database/repositories/ExpensifyNotificationToken.repository';
+import { ExpensifyNotificationTokenRepository } from '../../database/repositories/ExpensifyNotificationToken.repository';
 
 @Injectable()
 export class ExpensifyNotificationService implements OnModuleInit {

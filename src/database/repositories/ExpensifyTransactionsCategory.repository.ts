@@ -67,6 +67,22 @@ export class ExpensifyTransactionsCategoryRepository {
     return true;
   }
 
+  async getDefaultCategory(transactionType: number) {
+    const [category] = await this.dbObject.db
+      .select()
+      .from(expTransactionCategories)
+      .where(
+        and(
+          eq(expTransactionCategories.exp_tc_label, 'Others'),
+          isNull(expTransactionCategories.exp_tc_user_id),
+          eq(expTransactionCategories.exp_tc_transaction_type, transactionType),
+        ),
+      )
+      .limit(1);
+
+    return category ?? null;
+  }
+
   async getAllCategories(id: string) {
     const conditions = [
       eq(expTransactionCategories.exp_tc_user_id, id),
@@ -80,14 +96,20 @@ export class ExpensifyTransactionsCategoryRepository {
       .from(expTransactionCategories)
       .leftJoin(
         expTransactions,
-        eq(expTransactionCategories.exp_tc_id, expTransactions.exp_ts_category),
+        and(
+          eq(expTransactionCategories.exp_tc_id, expTransactions.exp_ts_category),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
       )
       .where(or(...conditions))
       .groupBy(expTransactionCategories.exp_tc_id);
 
     return result;
   }
-  async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[], userId: string) {
+  async reorderCategories(
+    categories: Partial<SelectExpensifyTransactionCategories>[],
+    userId: string,
+  ) {
     const updates = categories.map((item, index) =>
       this.dbObject.db
         .update(expTransactionCategories)

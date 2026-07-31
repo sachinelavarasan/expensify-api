@@ -10,7 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
 import { ExpensifyService } from '../expensify.service';
-import { ExpensifyUserRepository } from 'src/database/repositories/ExpensifyUser.repository';
+import { ExpensifyUserRepository } from '../../../database/repositories/ExpensifyUser.repository';
 
 @Injectable()
 export class AuthExpensifyMiddleware implements NestMiddleware {
@@ -29,10 +29,12 @@ export class AuthExpensifyMiddleware implements NestMiddleware {
     }
 
     const user = await this.tryOwnJwt(bearerToken);
+    // console.log(user);
 
     if (!user) {
       throw new UnauthorizedException('Invalid session');
     }
+
     if (user.exp_us_is_deleted) {
       throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
     }

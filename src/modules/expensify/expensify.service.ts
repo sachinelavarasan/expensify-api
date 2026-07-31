@@ -5,28 +5,32 @@ import moment from 'moment';
 import {
   CreateBankAccountDto,
   CreateBudgetDto,
+  CreateDebtDto,
   CreateRecurringTransactionDto,
+  CreateRepaymentDto,
   CreateStarredTransactionDto,
   TransactionDto,
   UpdateBudgetDto,
+  UpdateDebtDto,
   UpdateRecurringTransactionDto,
 } from './dto/auth.dto';
-import { ExpensifyUserRepository } from 'src/database/repositories/ExpensifyUser.repository';
-import { ExpensifyTransactionsRepository } from 'src/database/repositories/ExpensifyTransactions.repository';
-import { ExpensifyTransactionsCategoryRepository } from 'src/database/repositories/ExpensifyTransactionsCategory.repository';
+import { ExpensifyUserRepository } from '../../database/repositories/ExpensifyUser.repository';
+import { ExpensifyTransactionsRepository } from '../../database/repositories/ExpensifyTransactions.repository';
+import { ExpensifyTransactionsCategoryRepository } from '../../database/repositories/ExpensifyTransactionsCategory.repository';
 import {
   InsertExpensifyBankAccounts,
   InsertExpensifyTransactionCategories,
   InsertExpensifyTransactions,
   SelectExpensifyTransactionCategories,
   SelectExpensifyUser,
-} from 'src/database/schemas/schema';
-import { ExpensifyBankAccountRepository } from 'src/database/repositories/ExpensifyBankAccounts.repository';
-import { ExpStarredTransactionsRepository } from 'src/database/repositories/ExpStarredTransactions.repository';
-import { ExpensifyNotificationTokenRepository } from 'src/database/repositories/ExpensifyNotificationToken.repository';
-import { ExpensifyBudgetRepository } from 'src/database/repositories/ExpBudget.repository';
-import { RecurringTransactionsRepository } from 'src/database/repositories/RecurringTransactions.repository';
-import { StorageService } from 'src/storage/storage.service';
+} from '../../database/schemas/schema';
+import { ExpensifyBankAccountRepository } from '../../database/repositories/ExpensifyBankAccounts.repository';
+import { ExpStarredTransactionsRepository } from '../../database/repositories/ExpStarredTransactions.repository';
+import { ExpensifyNotificationTokenRepository } from '../../database/repositories/ExpensifyNotificationToken.repository';
+import { ExpensifyBudgetRepository } from '../../database/repositories/ExpBudget.repository';
+import { RecurringTransactionsRepository } from '../../database/repositories/RecurringTransactions.repository';
+import { DebtsRepository } from '../../database/repositories/Debts.repository';
+import { StorageService } from '../../storage/storage.service';
 
 @Injectable()
 export class ExpensifyService {
@@ -39,6 +43,7 @@ export class ExpensifyService {
     private expensifyNotificationTokenRepository: ExpensifyNotificationTokenRepository,
     private expensifyBudgetRepository: ExpensifyBudgetRepository,
     private recurringTransactionsRepository: RecurringTransactionsRepository,
+    private debtsRepository: DebtsRepository,
     private storageService: StorageService,
   ) {}
 
@@ -50,6 +55,10 @@ export class ExpensifyService {
       transaction_type?: number;
       transaction_label?: string;
       accountId?: string;
+      minAmount?: string;
+      maxAmount?: string;
+      categoryIds?: string[];
+      tags?: string[];
     },
   ) {
     return await this.expensifyTransactionsRepository.getAllTransactions(id, args);
@@ -112,6 +121,32 @@ export class ExpensifyService {
   }
   async deleteTransaction(id: string, userId: string) {
     return await this.expensifyTransactionsRepository.deleteTransaction(id, userId);
+  }
+  async bulkDeleteTransactions(ids: string[], userId: string) {
+    return await this.expensifyTransactionsRepository.bulkDeleteTransactions(ids, userId);
+  }
+  async bulkUpdateTransactions(
+    ids: string[],
+    patch: { exp_tc_id?: string; exp_ts_tags?: string[] },
+    userId: string,
+  ) {
+    return await this.expensifyTransactionsRepository.bulkUpdateTransactions(ids, patch, userId);
+  }
+  async restoreTransaction(id: string, userId: string) {
+    return await this.expensifyTransactionsRepository.restoreTransaction(id, userId);
+  }
+  async purgeTransaction(id: string, userId: string) {
+    const { attachmentUrl } = await this.expensifyTransactionsRepository.purgeTransaction(
+      id,
+      userId,
+    );
+    if (attachmentUrl) {
+      await this.storageService.deleteTransactionAttachment(attachmentUrl);
+    }
+    return true;
+  }
+  async getTrashedTransactions(userId: string) {
+    return await this.expensifyTransactionsRepository.getTrashedTransactions(userId);
   }
   async editTransaction(id: string, dto: TransactionDto, userId: string) {
     return await this.expensifyTransactionsRepository.updateTransaction(id, dto, userId);
@@ -263,8 +298,18 @@ export class ExpensifyService {
   }
 
   async uploadProfileImage(id: string, imageBase64: string) {
+    const existingUser = await this.usersRepository.getOne({ user_id: id });
+    const previousProfileUrl = existingUser?.exp_us_profile_url;
+
     const profileUrl = await this.storageService.uploadProfileImage(id, imageBase64);
     await this.usersRepository.updateUser({ exp_us_profile_url: profileUrl }, { exp_user_id: id });
+
+    // Only delete the old image after the new one is uploaded and saved, so a failed
+    // upload never leaves the user without any photo on record.
+    if (previousProfileUrl) {
+      await this.storageService.deleteProfileImage(previousProfileUrl).catch(() => {});
+    }
+
     return this.fetchProfile(id);
   }
 
@@ -276,6 +321,14 @@ export class ExpensifyService {
     await this.usersRepository.updateUser({ exp_us_profile_url: null }, { exp_user_id: id });
     return this.fetchProfile(id);
   }
+
+  async uploadTransactionAttachment(userId: string, fileBase64: string) {
+    return await this.storageService.uploadTransactionAttachment(userId, fileBase64);
+  }
+
+  async removeTransactionAttachment(url: string) {
+    return await this.storageService.deleteTransactionAttachment(url);
+  }
   async bulkTransactions(transactions: InsertExpensifyTransactions[]) {
     try {
       await this.expensifyTransactionsRepository.save(transactions);
@@ -284,6 +337,12 @@ export class ExpensifyService {
       console.log(e);
       throw new BadRequestException(e);
     }
+  }
+  async findPotentialDuplicates(userId: string, dates: string[]) {
+    return await this.expensifyTransactionsRepository.findByUserAndDates(userId, dates);
+  }
+  async getDefaultCategory(transactionType: number) {
+    return await this.expensifyTransactionsCategoryRepository.getDefaultCategory(transactionType);
   }
     async getAllTransactionsByCategory(
     id: string,
@@ -349,5 +408,33 @@ export class ExpensifyService {
     }
 
     return { imported };
+  }
+
+  async getAllDebts(userId: string) {
+    return await this.debtsRepository.getAllForUser(userId);
+  }
+
+  async getDebt(id: string, userId: string) {
+    return await this.debtsRepository.getOne(id, userId);
+  }
+
+  async createDebt(dto: CreateDebtDto) {
+    return await this.debtsRepository.create(dto);
+  }
+
+  async updateDebt(dto: UpdateDebtDto, id: string, userId: string) {
+    return await this.debtsRepository.update(dto, id, userId);
+  }
+
+  async deleteDebt(id: string, userId: string) {
+    return await this.debtsRepository.softDelete(id, userId);
+  }
+
+  async addDebtRepayment(debtId: string, userId: string, dto: CreateRepaymentDto) {
+    return await this.debtsRepository.addRepayment(debtId, userId, dto);
+  }
+
+  async deleteDebtRepayment(repaymentId: string, debtId: string, userId: string) {
+    return await this.debtsRepository.deleteRepayment(repaymentId, debtId, userId);
   }
 }

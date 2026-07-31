@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class TransactionDto {
   @IsString()
@@ -32,6 +32,15 @@ export class TransactionDto {
   @IsOptional()
   @IsString()
   exp_ts_note?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  exp_ts_tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  exp_ts_attachment_url?: string | null;
 
   exp_ts_user_id: string;
   exp_st_id: boolean;
@@ -126,4 +135,57 @@ export class UpdateRecurringTransactionDto {
   exp_rt_end_date?: string | null;
   exp_rt_next_due_date?: string;
   exp_rt_is_active?: boolean;
+}
+
+export class CreateDebtDto {
+  @IsString()
+  @IsNotEmpty()
+  exp_dt_person_name!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^(owed_to_me|owed_by_me)$/, {
+    message: 'Direction must be owed_to_me or owed_by_me',
+  })
+  exp_dt_direction!: 'owed_to_me' | 'owed_by_me';
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d+(\.\d{1,2})?$/, { message: 'Amount must be a valid number string' })
+  exp_dt_amount!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be in YYYY-MM-DD format' })
+  exp_dt_due_date?: string | null;
+
+  @IsOptional()
+  @IsString()
+  exp_dt_note?: string | null;
+
+  exp_dt_user_id: string;
+}
+
+export class UpdateDebtDto {
+  exp_dt_person_name?: string;
+  exp_dt_direction?: 'owed_to_me' | 'owed_by_me';
+  exp_dt_amount?: string;
+  exp_dt_due_date?: string | null;
+  exp_dt_note?: string | null;
+}
+
+export class CreateRepaymentDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d+(\.\d{1,2})?$/, { message: 'Amount must be a valid number string' })
+  exp_dr_amount!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be in YYYY-MM-DD format' })
+  exp_dr_date!: string;
+
+  @IsOptional()
+  @IsString()
+  exp_dr_note?: string | null;
 }

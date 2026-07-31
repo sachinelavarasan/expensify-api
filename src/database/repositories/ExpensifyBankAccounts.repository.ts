@@ -6,7 +6,7 @@ import { Database } from '../types/Database';
 
 import { expBankAccounts, expTransactions, InsertExpensifyBankAccounts } from '../schemas/schema';
 import { ExpensifyTransactionsRepository } from './ExpensifyTransactions.repository';
-import { CreateBankAccountDto } from 'src/modules/expensify/dto/auth.dto';
+import { CreateBankAccountDto } from '../../modules/expensify/dto/auth.dto';
 
 export class ExpensifyBankAccountRepository {
   constructor(
