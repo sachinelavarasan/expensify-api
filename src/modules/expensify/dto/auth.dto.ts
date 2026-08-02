@@ -52,6 +52,7 @@ export class CreateBankAccountDto {
   exp_ba_balance: string;
   exp_ba_user_id: string;
   exp_ba_icon: string;
+  exp_ba_is_primary?: boolean;
 }
 
 export class UpdateBankAccountDto {

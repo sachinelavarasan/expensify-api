@@ -420,6 +420,14 @@ export class ExpensifyController {
     return this.expensifyService.updateAccount(id, insertDto, exp_us_id);
   }
 
+  @Patch('accounts/:id/primary')
+  setPrimary(@Param('id') id: string, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.setPrimaryAccount(id, exp_us_id);
+  }
+
   @Delete('accounts/:id')
   async remove(@Param('id') id: string, @Req() req: ExpressWithUser, @Res() res: Express.Response) {
     try {

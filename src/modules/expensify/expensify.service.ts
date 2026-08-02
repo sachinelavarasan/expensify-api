@@ -218,6 +218,9 @@ export class ExpensifyService {
   async removeAccount(id: string, userId: string) {
     return await this.expensifyBankAccountRepository.deleteBankAccount(id, userId);
   }
+  async setPrimaryAccount(id: string, userId: string) {
+    return await this.expensifyBankAccountRepository.setPrimaryAccount(id, userId);
+  }
 
   async starTransaction(dto: CreateStarredTransactionDto) {
     return await this.expStarredTransactionsRepository.starTransaction(dto);

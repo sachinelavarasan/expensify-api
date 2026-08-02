@@ -25,8 +25,17 @@ export class ExpensifyBankAccountRepository {
     });
   }
   async createBankAccount(data: CreateBankAccountDto) {
-    const account = data as unknown as InsertExpensifyBankAccounts;
-    return await this.dbObject.db.insert(expBankAccounts).values(account).returning();
+    const { exp_ba_is_primary: wantsPrimary, ...rest } = data;
+    const account = rest as unknown as InsertExpensifyBankAccounts;
+    const created = await this.dbObject.db.insert(expBankAccounts).values(account).returning();
+
+    // Reuses setPrimaryAccount's unset-others logic instead of duplicating it here.
+    if (wantsPrimary && created[0]) {
+      await this.setPrimaryAccount(created[0].exp_ba_id, created[0].exp_ba_user_id);
+      created[0].exp_ba_is_primary = true;
+    }
+
+    return created;
   }
   async updateBankAccount(data: Partial<InsertExpensifyBankAccounts>, id: string, userId: string) {
     const existing = await this.dbObject.db.query.expBankAccounts.findFirst({
@@ -49,6 +58,33 @@ export class ExpensifyBankAccountRepository {
       .where(eq(expBankAccounts.exp_ba_id, id))
       .returning();
   }
+  // Exactly one account may be primary at a time, so this unsets it on every
+  // other account for the user in the same transaction as setting it here.
+  async setPrimaryAccount(id: string, userId: string) {
+    const existing = await this.dbObject.db.query.expBankAccounts.findFirst({
+      where: (expBankAccounts, { eq, and }) =>
+        and(eq(expBankAccounts.exp_ba_id, id), eq(expBankAccounts.exp_ba_user_id, userId)),
+    });
+
+    if (!existing) {
+      throw new Error('Bank account not found');
+    }
+
+    await this.dbObject.db.transaction(async (tx) => {
+      await tx
+        .update(expBankAccounts)
+        .set({ exp_ba_is_primary: false })
+        .where(eq(expBankAccounts.exp_ba_user_id, userId));
+
+      await tx
+        .update(expBankAccounts)
+        .set({ exp_ba_is_primary: true })
+        .where(eq(expBankAccounts.exp_ba_id, id));
+    });
+
+    return true;
+  }
+
   async deleteBankAccount(id: string, userId: string) {
     await this.dbObject.db.transaction(async (tx) => {
       await this.dbObject.db.delete(expBankAccounts).where(eq(expBankAccounts.exp_ba_id, id));
