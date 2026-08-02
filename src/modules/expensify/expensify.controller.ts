@@ -42,6 +42,7 @@ import {
 import * as ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import moment from 'moment';
+import { Throttle } from '@nestjs/throttler';
 import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
 @Controller('expensify')
@@ -360,6 +361,23 @@ export class ExpensifyController {
     return this.expensifyService.deleteCategory(id, exp_us_id);
   }
 
+  @Post('ai/suggest-category')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async suggestCategory(
+    @Body() body: { title: string; exp_tt_id: number },
+    @Req() req: ExpressWithUser,
+  ) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    const categoryId = await this.expensifyService.suggestCategory(
+      exp_us_id,
+      body.title,
+      body.exp_tt_id,
+    );
+    return { exp_tc_id: categoryId };
+  }
+
   @Post('accounts')
   create(@Body() dto: CreateBankAccountDto, @Req() req: ExpressWithUser) {
     const {
@@ -421,6 +439,22 @@ export class ExpensifyController {
       user: { exp_us_id },
     } = req;
     return this.expensifyService.starTransaction({ ...dto, exp_st_user_id: exp_us_id });
+  }
+
+  @Post('starred/bulk')
+  async bulkStarTransactions(@Body() body: { ids: string[] }, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.bulkStarTransactions(exp_us_id, body.ids);
+  }
+
+  @Delete('starred/bulk')
+  async bulkUnstarTransactions(@Body() body: { ids: string[] }, @Req() req: ExpressWithUser) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.bulkUnstarTransactions(exp_us_id, body.ids);
   }
 
   @Delete('starred/:transactionId')
@@ -709,10 +743,14 @@ export class ExpensifyController {
   async updateProfile(
     @Req() req: ExpressWithUser,
     @Res() res: Express.Response,
-    @Body() body: { name: string },
+    @Body() body: { name: string; phone?: string },
   ) {
     try {
-      const user = await this.expensifyService.updateName(req.user.exp_us_id, body.name);
+      const user = await this.expensifyService.updateName(
+        req.user.exp_us_id,
+        body.name,
+        body.phone,
+      );
       return res.status(200).json({ ...user });
     } catch (error) {
       console.log(error);

@@ -355,6 +355,7 @@ export class ExpensifyTransactionsRepository {
         exp_tt_id: expTransactionTypes.exp_tt_id,
         exp_ba_id: expBankAccounts.exp_ba_id,
         exp_ba_name: expBankAccounts.exp_ba_name,
+        exp_st_id: expStarredTransactions.exp_st_id,
       })
       .from(expTransactions)
       .innerJoin(
@@ -368,6 +369,10 @@ export class ExpensifyTransactionsRepository {
       .innerJoin(
         expTransactionCategories,
         eq(expTransactions.exp_ts_category, expTransactionCategories.exp_tc_id),
+      )
+      .leftJoin(
+        expStarredTransactions,
+        eq(expTransactions.exp_ts_id, expStarredTransactions.exp_st_transaction_id),
       )
       .orderBy(desc(expTransactions.exp_ts_date), desc(expTransactions.exp_ts_created_at))
       .where(and(...conditions));

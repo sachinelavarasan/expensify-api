@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../database/database.module';
 import { MailModule } from '../../mail/mail.module';
 import { StorageModule } from '../../storage/storage.module';
+import { AiModule } from '../../ai/ai.module';
 
 import { ExpensifyController } from './expensify.controller';
 import { AuthExpensifyMiddleware } from './middleware/auth-expensify.middleware';
@@ -16,7 +17,7 @@ import { ExpensifyAuthService } from './auth/expensify-auth.service';
 
 @Global()
 @Module({
-  imports: [JwtModule.register({}), DatabaseModule, MailModule, StorageModule],
+  imports: [JwtModule.register({}), DatabaseModule, MailModule, StorageModule, AiModule],
   controllers: [ExpensifyController, ExpensifyAuthController],
   providers: [
     ExpensifyService,

@@ -92,6 +92,9 @@ export class ExpensifyTransactionsCategoryRepository {
       .select({
         ...getTableColumns(expTransactionCategories),
         transaction_count: sql<number>`count(${expTransactions.exp_ts_id})`.as('transaction_count'),
+        total_spend: sql<string>`coalesce(sum(${expTransactions.exp_ts_amount}::numeric), 0)`.as(
+          'total_spend',
+        ),
       })
       .from(expTransactionCategories)
       .leftJoin(

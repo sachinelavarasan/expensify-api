@@ -31,6 +31,7 @@ import { ExpensifyBudgetRepository } from '../../database/repositories/ExpBudget
 import { RecurringTransactionsRepository } from '../../database/repositories/RecurringTransactions.repository';
 import { DebtsRepository } from '../../database/repositories/Debts.repository';
 import { StorageService } from '../../storage/storage.service';
+import { GeminiService } from '../../ai/gemini.service';
 
 @Injectable()
 export class ExpensifyService {
@@ -45,6 +46,7 @@ export class ExpensifyService {
     private recurringTransactionsRepository: RecurringTransactionsRepository,
     private debtsRepository: DebtsRepository,
     private storageService: StorageService,
+    private geminiService: GeminiService,
   ) {}
 
   async getAllTransactions(
@@ -164,6 +166,38 @@ export class ExpensifyService {
     return await this.expensifyTransactionsCategoryRepository.getAllCategories(id);
   }
 
+  // Returns a suggested category id, or null if Gemini is unavailable, errs,
+  // or returns anything that isn't exactly one of the user's own category ids
+  // (never trust free-form AI output as an id to act on).
+  async suggestCategory(userId: string, title: string, transactionType: number) {
+    const categories = await this.expensifyTransactionsCategoryRepository.getAllCategories(
+      userId,
+    );
+    const candidates = categories.filter(
+      (category) => category.exp_tc_transaction_type === transactionType,
+    );
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const prompt = [
+      'You categorize personal finance transactions.',
+      `Description: "${title}"`,
+      'Candidate categories (id: label):',
+      ...candidates.map((category) => `${category.exp_tc_id}: ${category.exp_tc_label}`),
+      'Reply with only the single best matching category id from the list above, and nothing else.',
+      'If none of the candidates are a reasonable match, reply with exactly: none',
+    ].join('\n');
+
+    const reply = await this.geminiService.generateText(prompt);
+    if (!reply) {
+      return null;
+    }
+
+    const match = candidates.find((category) => category.exp_tc_id === reply.trim());
+    return match ? match.exp_tc_id : null;
+  }
+
   async createAccount(dto: CreateBankAccountDto) {
     return await this.expensifyBankAccountRepository.createBankAccount(dto);
   }
@@ -196,6 +230,15 @@ export class ExpensifyService {
   }
   async isTransactionStarred(userId: string, transactionId: string) {
     return await this.expStarredTransactionsRepository.isTransactionStarred(userId, transactionId);
+  }
+  async bulkStarTransactions(userId: string, transactionIds: string[]) {
+    return await this.expStarredTransactionsRepository.bulkStarTransactions(userId, transactionIds);
+  }
+  async bulkUnstarTransactions(userId: string, transactionIds: string[]) {
+    return await this.expStarredTransactionsRepository.bulkUnstarTransactions(
+      userId,
+      transactionIds,
+    );
   }
   async reorderCategories(categories: Partial<SelectExpensifyTransactionCategories>[], userId: string) {
     return await this.expensifyTransactionsCategoryRepository.reorderCategories(categories, userId);
@@ -292,8 +335,11 @@ export class ExpensifyService {
     }
   }
 
-  async updateName(id: string, name: string) {
-    await this.usersRepository.updateUser({ exp_us_name: name }, { exp_user_id: id });
+  async updateName(id: string, name: string, phone?: string) {
+    await this.usersRepository.updateUser(
+      { exp_us_name: name, ...(phone !== undefined ? { exp_us_phone_no: phone } : {}) },
+      { exp_user_id: id },
+    );
     return this.fetchProfile(id);
   }
 

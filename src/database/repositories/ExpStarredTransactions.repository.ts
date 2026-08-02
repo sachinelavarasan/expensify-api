@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
 import {
@@ -59,6 +59,42 @@ export class ExpStarredTransactionsRepository {
       );
 
     return { message: 'Transaction unstarred' };
+  }
+
+  async bulkStarTransactions(userId: string, transactionIds: string[]) {
+    const alreadyStarred = await this.dbObject.db
+      .select({ id: expStarredTransactions.exp_st_transaction_id })
+      .from(expStarredTransactions)
+      .where(
+        and(
+          eq(expStarredTransactions.exp_st_user_id, userId),
+          inArray(expStarredTransactions.exp_st_transaction_id, transactionIds),
+        ),
+      )
+      .then((rows) => new Set(rows.map((row) => row.id)));
+
+    const toInsert = transactionIds
+      .filter((id) => !alreadyStarred.has(id))
+      .map((id) => ({ exp_st_user_id: userId, exp_st_transaction_id: id }));
+
+    if (toInsert.length > 0) {
+      await this.dbObject.db.insert(expStarredTransactions).values(toInsert);
+    }
+
+    return { message: 'Transactions starred' };
+  }
+
+  async bulkUnstarTransactions(userId: string, transactionIds: string[]) {
+    await this.dbObject.db
+      .delete(expStarredTransactions)
+      .where(
+        and(
+          eq(expStarredTransactions.exp_st_user_id, userId),
+          inArray(expStarredTransactions.exp_st_transaction_id, transactionIds),
+        ),
+      );
+
+    return { message: 'Transactions unstarred' };
   }
 
   async getUserStarredTransactions(userId: string) {
