@@ -38,9 +38,14 @@ export class ExpensifyBankAccountRepository {
       throw new Error('Bank account not found');
     }
 
+    // exp_ba_balance is the live running balance maintained by transaction
+    // create/update/delete/restore - it must never be overwritten by the
+    // account-edit form.
+    const { exp_ba_balance, ...safeData } = data;
+
     return await this.dbObject.db
       .update(expBankAccounts)
-      .set(data)
+      .set(safeData)
       .where(eq(expBankAccounts.exp_ba_id, id))
       .returning();
   }
