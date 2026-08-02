@@ -103,10 +103,7 @@ export class ExpensifyAuthService {
     const existing = await this.usersRepository.getOne({ email: dto.email });
     if (existing) {
       if (existing.exp_us_email_verified) {
-        throw new HttpException(
-          'An account with this email already exists',
-          HttpStatus.CONFLICT,
-        );
+        throw new HttpException('An account with this email already exists', HttpStatus.CONFLICT);
       }
       await this.issueAndSendOtp(existing, 'signup_verify');
       return { message: 'Verification code sent to your email' };

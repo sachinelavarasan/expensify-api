@@ -604,31 +604,31 @@ export class ExpensifyController {
           [
             {
               text: 'No',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Account Name',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Title',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Date',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Category',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Transaction Type',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
             {
               text: 'Amount',
-              font: 'Helvetica-Bold',
+              font: { family: 'Helvetica-Bold' },
             },
           ],
           ...transactions.map((t, index) => [
@@ -859,7 +859,7 @@ export class ExpensifyController {
       dupCandidates.map((c) => c.dupDate),
     );
 
-    type DuplicateRow = typeof validRows[number] & {
+    type DuplicateRow = (typeof validRows)[number] & {
       possibleDuplicate: true;
       matchedTransaction: {
         exp_ts_id: string;
@@ -873,7 +873,8 @@ export class ExpensifyController {
     const possibleDuplicates: DuplicateRow[] = [];
     // Rows with no match against existing DB transactions yet - still need to be
     // checked against each other in case the file itself contains repeated rows.
-    const remainingRows: { row: typeof validRows[number]; dupDate: string; dupTitle: string }[] = [];
+    const remainingRows: { row: (typeof validRows)[number]; dupDate: string; dupTitle: string }[] =
+      [];
 
     validRows.forEach((row, idx) => {
       const { dupDate, dupTitle } = dupCandidates[idx];

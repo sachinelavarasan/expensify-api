@@ -9,7 +9,11 @@ import {
   InsertExpensifyDebtRepayments,
   InsertExpensifyDebts,
 } from '../schemas/schema';
-import { CreateDebtDto, CreateRepaymentDto, UpdateDebtDto } from '../../modules/expensify/dto/auth.dto';
+import {
+  CreateDebtDto,
+  CreateRepaymentDto,
+  UpdateDebtDto,
+} from '../../modules/expensify/dto/auth.dto';
 
 @Injectable()
 export class DebtsRepository {

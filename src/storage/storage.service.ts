@@ -18,7 +18,8 @@ const ALLOWED_ATTACHMENT_TYPES = [
 // a public_id we choose ourselves - this keeps the resulting secure_url shape predictable
 // enough to parse the public_id back out for deletion, given only the URL string stored in
 // the database (matching this service's existing public signatures).
-const CLOUDINARY_URL_PATTERN = /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/(.+)\.[a-zA-Z0-9]+$/;
+const CLOUDINARY_URL_PATTERN =
+  /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v\d+\/(.+)\.[a-zA-Z0-9]+$/;
 
 @Injectable()
 export class StorageService {

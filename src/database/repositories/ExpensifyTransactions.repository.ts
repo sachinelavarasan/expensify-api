@@ -377,7 +377,10 @@ export class ExpensifyTransactionsRepository {
   // non-deleted transactions on any of the staged rows' dates, letting the
   // caller do the final amount/title match in JS (exp_ts_amount is stored as
   // text with inconsistent formatting, so exact-match there is unreliable).
-  async findByUserAndDates(userId: string, dates: string[]): Promise<SelectExpensifyTransactions[]> {
+  async findByUserAndDates(
+    userId: string,
+    dates: string[],
+  ): Promise<SelectExpensifyTransactions[]> {
     if (!dates.length) return [];
     return await this.dbObject.db
       .select()
