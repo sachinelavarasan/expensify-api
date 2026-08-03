@@ -50,6 +50,13 @@
       "when": 1785427315410,
       "tag": "0006_add_debts_and_repayments",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785767718029,
+      "tag": "0007_add_transfers",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { Inject } from '@nestjs/common';
-import { and, asc, eq, or } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
@@ -86,8 +86,27 @@ export class ExpensifyBankAccountRepository {
   }
 
   async deleteBankAccount(id: string, userId: string) {
+    // Blocks deleting an account that has active transfer history, rather
+    // than cascading the delete to the linked leg living on the other
+    // account - that account wasn't the one the user asked to touch.
+    const activeTransfer = await this.dbObject.db.query.expTransactions.findFirst({
+      where: (expTransactions, { eq, and }) =>
+        and(
+          eq(expTransactions.exp_ts_bank_account_id, id),
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNotNull(expTransactions.exp_ts_transfer_group_id),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+    });
+
+    if (activeTransfer) {
+      throw new Error(
+        'Cannot delete an account with existing transfer history. Delete those transfers first.',
+      );
+    }
+
     await this.dbObject.db.transaction(async (tx) => {
-      await this.dbObject.db.delete(expBankAccounts).where(eq(expBankAccounts.exp_ba_id, id));
+      await tx.delete(expBankAccounts).where(eq(expBankAccounts.exp_ba_id, id));
       await tx
         .delete(expTransactions)
         .where(

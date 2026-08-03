@@ -1,4 +1,5 @@
 import { Inject } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   and,
   desc,
@@ -27,7 +28,7 @@ import {
   InsertExpensifyTransactions,
   SelectExpensifyTransactions,
 } from '../schemas/schema';
-import { TransactionDto } from '../../modules/expensify/dto/auth.dto';
+import { CreateTransferDto, TransactionDto } from '../../modules/expensify/dto/auth.dto';
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
 import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
@@ -59,6 +60,8 @@ export class ExpensifyTransactionsRepository {
         exp_tc_icon: expTransactionCategories.exp_tc_icon,
         exp_tc_icon_bg_color: expTransactionCategories.exp_tc_icon_bg_color,
         exp_ts_bank_account_id: expTransactions.exp_ts_bank_account_id,
+        exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
       })
       .from(expTransactions)
       .innerJoin(
@@ -145,7 +148,129 @@ export class ExpensifyTransactionsRepository {
     return row;
   }
 
+  // Debits the source account, credits the destination account, and inserts
+  // two linked exp_tt_id=3 rows (plus an ordinary type-1 expense row for the
+  // fee, if any) sharing one exp_ts_transfer_group_id - all in a single
+  // db.transaction, unlike createTransaction's non-atomic pattern above.
+  async createTransfer(dto: CreateTransferDto) {
+    const userId = dto.exp_ts_user_id;
+    const fromId = dto.exp_ts_from_bank_account_id;
+    const toId = dto.exp_ts_to_bank_account_id;
+
+    if (fromId === toId) {
+      throw new Error('Source and destination accounts must be different');
+    }
+
+    const fromAccount = await this.dbObject.db.query.expBankAccounts.findFirst({
+      where: (expBankAccounts, { eq, and }) =>
+        and(
+          eq(expBankAccounts.exp_ba_id, fromId),
+          eq(expBankAccounts.exp_ba_user_id, userId),
+          eq(expBankAccounts.exp_ba_is_active, 1),
+        ),
+    });
+    const toAccount = await this.dbObject.db.query.expBankAccounts.findFirst({
+      where: (expBankAccounts, { eq, and }) =>
+        and(
+          eq(expBankAccounts.exp_ba_id, toId),
+          eq(expBankAccounts.exp_ba_user_id, userId),
+          eq(expBankAccounts.exp_ba_is_active, 1),
+        ),
+    });
+
+    if (!fromAccount || !toAccount) {
+      throw new Error('One or both bank accounts are not active or not found');
+    }
+
+    const [transferCategory] = await this.dbObject.db
+      .select()
+      .from(expTransactionCategories)
+      .where(
+        and(
+          eq(expTransactionCategories.exp_tc_label, 'Transfer'),
+          isNull(expTransactionCategories.exp_tc_user_id),
+          eq(expTransactionCategories.exp_tc_transaction_type, 3),
+        ),
+      )
+      .limit(1);
+
+    if (!transferCategory) {
+      throw new Error(`'Transfer' category not found`);
+    }
+
+    const amount = parseFloat(dto.exp_ts_amount) || 0;
+    if (amount <= 0) {
+      throw new Error('Invalid transfer amount');
+    }
+
+    if (parseFloat(fromAccount.exp_ba_balance) < amount) {
+      throw new Error('Transfer amount exceeds the source account balance');
+    }
+
+    const title = normalizeTransactionTitle(dto.exp_ts_title);
+    const groupId = randomUUID();
+
+    return await this.dbObject.db.transaction(async (tx) => {
+      await tx
+        .update(expBankAccounts)
+        .set({
+          exp_ba_balance: (parseFloat(fromAccount.exp_ba_balance) - amount).toFixed(2),
+        })
+        .where(eq(expBankAccounts.exp_ba_id, fromId));
+
+      await tx
+        .update(expBankAccounts)
+        .set({ exp_ba_balance: (parseFloat(toAccount.exp_ba_balance) + amount).toFixed(2) })
+        .where(eq(expBankAccounts.exp_ba_id, toId));
+
+      const [debitLeg] = await tx
+        .insert(expTransactions)
+        .values({
+          exp_ts_user_id: userId,
+          exp_ts_title: title,
+          exp_ts_amount: amount.toFixed(2),
+          exp_ts_date: dto.exp_ts_date,
+          exp_ts_time: dto.exp_ts_time,
+          exp_ts_note: dto.exp_ts_note ?? null,
+          exp_ts_transaction_type: 3,
+          exp_ts_category: transferCategory.exp_tc_id,
+          exp_ts_bank_account_id: fromId,
+          exp_ts_transfer_group_id: groupId,
+          exp_ts_transfer_direction: 'out',
+        })
+        .returning();
+
+      const [creditLeg] = await tx
+        .insert(expTransactions)
+        .values({
+          exp_ts_user_id: userId,
+          exp_ts_title: title,
+          exp_ts_amount: amount.toFixed(2),
+          exp_ts_date: dto.exp_ts_date,
+          exp_ts_time: dto.exp_ts_time,
+          exp_ts_note: dto.exp_ts_note ?? null,
+          exp_ts_transaction_type: 3,
+          exp_ts_category: transferCategory.exp_tc_id,
+          exp_ts_bank_account_id: toId,
+          exp_ts_transfer_group_id: groupId,
+          exp_ts_transfer_direction: 'in',
+        })
+        .returning();
+
+      return { debitLeg, creditLeg };
+    });
+  }
+
   async save(transactions: InsertExpensifyTransactions[]) {
+    // Defense-in-depth: this path only debits/credits a single account and
+    // has no exp_ts_transfer_group_id/paired-leg concept - a type 3 row
+    // here would be a broken, un-paired transfer with wrong balance math.
+    // Bulk import is guarded against this at the controller too; this
+    // repeats the check for any other caller of save().
+    if (transactions.some((t) => Number(t.exp_ts_transaction_type) === 3)) {
+      throw new Error('Transfers cannot be bulk imported');
+    }
+
     const selectedAcc = await this.dbObject.db.query.expBankAccounts.findFirst({
       where: (expBankAccounts, { eq }) => {
         return and(
@@ -193,6 +318,10 @@ export class ExpensifyTransactionsRepository {
 
     if (!existingTransaction) {
       throw new Error('Transaction not found');
+    }
+
+    if (existingTransaction.exp_ts_transfer_group_id) {
+      throw new Error('Transfers cannot be edited - delete and recreate instead');
     }
 
     const transaction = data as unknown as InsertExpensifyTransactions;
@@ -356,6 +485,8 @@ export class ExpensifyTransactionsRepository {
         exp_ba_id: expBankAccounts.exp_ba_id,
         exp_ba_name: expBankAccounts.exp_ba_name,
         exp_st_id: expStarredTransactions.exp_st_id,
+        exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
       })
       .from(expTransactions)
       .innerJoin(
@@ -425,6 +556,8 @@ export class ExpensifyTransactionsRepository {
         exp_tt_id: expTransactionTypes.exp_tt_id,
         exp_ba_id: expBankAccounts.exp_ba_id,
         exp_ba_name: expBankAccounts.exp_ba_name,
+        exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
       })
       .from(expTransactions)
       .innerJoin(
@@ -451,6 +584,48 @@ export class ExpensifyTransactionsRepository {
       .offset(offset);
   }
 
+  // A transfer's balance reversal depends on the direction of that specific
+  // leg rather than a plain expense/income binary: a transfer-out leg moved
+  // money out of its own account (like an expense), a transfer-in leg moved
+  // money into its own account (like income). Shared by delete/restore/bulk
+  // delete below so the three-way branch only lives in one place.
+  private isOutflow(
+    transaction: Pick<
+      SelectExpensifyTransactions,
+      'exp_ts_transaction_type' | 'exp_ts_transfer_direction'
+    >,
+  ) {
+    return (
+      transaction.exp_ts_transaction_type === 1 ||
+      (transaction.exp_ts_transaction_type === 3 && transaction.exp_ts_transfer_direction === 'out')
+    );
+  }
+
+  // Every row sharing a transfer's exp_ts_transfer_group_id must be
+  // soft-deleted/restored together, or the two accounts involved would end
+  // up with only one side of the transfer reversed.
+  private async getGroupRows(
+    tx: any,
+    transaction: SelectExpensifyTransactions,
+    userId: string,
+    wantDeleted: boolean,
+  ): Promise<SelectExpensifyTransactions[]> {
+    if (!transaction.exp_ts_transfer_group_id) {
+      return [transaction];
+    }
+
+    return await tx.query.expTransactions.findMany({
+      where: (expTransactions, { eq, and, isNull, isNotNull }) =>
+        and(
+          eq(expTransactions.exp_ts_transfer_group_id, transaction.exp_ts_transfer_group_id),
+          eq(expTransactions.exp_ts_user_id, userId),
+          wantDeleted
+            ? isNotNull(expTransactions.exp_ts_deleted_at)
+            : isNull(expTransactions.exp_ts_deleted_at),
+        ),
+    });
+  }
+
   async deleteTransaction(id: string, userId: string) {
     const existingTransaction = await this.dbObject.db.query.expTransactions.findFirst({
       where: (expTransactions, { eq, and }) =>
@@ -461,39 +636,38 @@ export class ExpensifyTransactionsRepository {
       throw new Error('Transaction not found');
     }
 
-    const accountId = existingTransaction.exp_ts_bank_account_id;
-
-    const account = await this.dbObject.db.query.expBankAccounts.findFirst({
-      where: (expBankAccounts, { eq }) =>
-        and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
-    });
-
-    if (!account) {
-      throw new Error('Bank account not found or inactive');
-    }
-
-    const currentBalance = parseFloat(account.exp_ba_balance);
-    const isExpense = existingTransaction.exp_ts_transaction_type === 1;
-    const transactionAmount = parseFloat(existingTransaction.exp_ts_amount);
-
-    const updatedBalance = isExpense
-      ? currentBalance + transactionAmount
-      : currentBalance - transactionAmount;
-
     await this.dbObject.db.transaction(async (tx) => {
-      await tx
-        .update(expTransactions)
-        .set({ exp_ts_deleted_at: new Date().toISOString() })
-        .where(eq(expTransactions.exp_ts_id, id))
-        .returning();
+      const rows = await this.getGroupRows(tx, existingTransaction, userId, false);
 
-      await tx
-        .update(expBankAccounts)
-        .set({
-          exp_ba_balance: updatedBalance.toFixed(2),
-        })
-        .where(eq(expBankAccounts.exp_ba_id, accountId))
-        .returning();
+      for (const row of rows) {
+        const accountId = row.exp_ts_bank_account_id;
+
+        const account = await tx.query.expBankAccounts.findFirst({
+          where: (expBankAccounts, { eq }) =>
+            and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
+        });
+
+        if (!account) {
+          throw new Error('Bank account not found or inactive');
+        }
+
+        const currentBalance = parseFloat(account.exp_ba_balance);
+        const transactionAmount = parseFloat(row.exp_ts_amount);
+
+        const updatedBalance = this.isOutflow(row)
+          ? currentBalance + transactionAmount
+          : currentBalance - transactionAmount;
+
+        await tx
+          .update(expTransactions)
+          .set({ exp_ts_deleted_at: new Date().toISOString() })
+          .where(eq(expTransactions.exp_ts_id, row.exp_ts_id));
+
+        await tx
+          .update(expBankAccounts)
+          .set({ exp_ba_balance: updatedBalance.toFixed(2) })
+          .where(eq(expBankAccounts.exp_ba_id, accountId));
+      }
     });
 
     return true;
@@ -503,11 +677,15 @@ export class ExpensifyTransactionsRepository {
   // but inlined inside one shared db.transaction so the whole batch is atomic
   // (calling deleteTransaction in a loop would open/commit N separate transactions).
   // Rows that are missing, already trashed, or on an inactive account are skipped
-  // rather than aborting the whole batch over one stale id.
+  // rather than aborting the whole batch over one stale id. If a requested id is
+  // one leg of a transfer, its group siblings are pulled in too so a transfer
+  // never ends up half-deleted just because only one leg was selected.
   async bulkDeleteTransactions(ids: string[], userId: string) {
     if (!ids.length) return true;
 
     await this.dbObject.db.transaction(async (tx) => {
+      const seen = new Set<string>();
+
       for (const id of ids) {
         const existingTransaction = await tx.query.expTransactions.findFirst({
           where: (expTransactions, { eq, and }) =>
@@ -518,34 +696,43 @@ export class ExpensifyTransactionsRepository {
           continue;
         }
 
-        const accountId = existingTransaction.exp_ts_bank_account_id;
+        const rows = await this.getGroupRows(tx, existingTransaction, userId, false);
 
-        const account = await tx.query.expBankAccounts.findFirst({
-          where: (expBankAccounts, { eq }) =>
-            and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
-        });
+        for (const row of rows) {
+          if (seen.has(row.exp_ts_id)) continue;
+          seen.add(row.exp_ts_id);
 
-        if (!account) {
-          continue;
+          const accountId = row.exp_ts_bank_account_id;
+
+          const account = await tx.query.expBankAccounts.findFirst({
+            where: (expBankAccounts, { eq }) =>
+              and(
+                eq(expBankAccounts.exp_ba_id, accountId),
+                eq(expBankAccounts.exp_ba_is_active, 1),
+              ),
+          });
+
+          if (!account) {
+            continue;
+          }
+
+          const currentBalance = parseFloat(account.exp_ba_balance);
+          const transactionAmount = parseFloat(row.exp_ts_amount);
+
+          const updatedBalance = this.isOutflow(row)
+            ? currentBalance + transactionAmount
+            : currentBalance - transactionAmount;
+
+          await tx
+            .update(expTransactions)
+            .set({ exp_ts_deleted_at: new Date().toISOString() })
+            .where(eq(expTransactions.exp_ts_id, row.exp_ts_id));
+
+          await tx
+            .update(expBankAccounts)
+            .set({ exp_ba_balance: updatedBalance.toFixed(2) })
+            .where(eq(expBankAccounts.exp_ba_id, accountId));
         }
-
-        const currentBalance = parseFloat(account.exp_ba_balance);
-        const isExpense = existingTransaction.exp_ts_transaction_type === 1;
-        const transactionAmount = parseFloat(existingTransaction.exp_ts_amount);
-
-        const updatedBalance = isExpense
-          ? currentBalance + transactionAmount
-          : currentBalance - transactionAmount;
-
-        await tx
-          .update(expTransactions)
-          .set({ exp_ts_deleted_at: new Date().toISOString() })
-          .where(eq(expTransactions.exp_ts_id, id));
-
-        await tx
-          .update(expBankAccounts)
-          .set({ exp_ba_balance: updatedBalance.toFixed(2) })
-          .where(eq(expBankAccounts.exp_ba_id, accountId));
       }
     });
 
@@ -596,40 +783,39 @@ export class ExpensifyTransactionsRepository {
       throw new Error('Transaction is not in trash');
     }
 
-    const accountId = existingTransaction.exp_ts_bank_account_id;
-
-    const account = await this.dbObject.db.query.expBankAccounts.findFirst({
-      where: (expBankAccounts, { eq }) =>
-        and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
-    });
-
-    if (!account) {
-      throw new Error('Bank account not found or inactive');
-    }
-
-    const currentBalance = parseFloat(account.exp_ba_balance);
-    const isExpense = existingTransaction.exp_ts_transaction_type === 1;
-    const transactionAmount = parseFloat(existingTransaction.exp_ts_amount);
-
-    // Inverse of deleteTransaction's adjustment above
-    const updatedBalance = isExpense
-      ? currentBalance - transactionAmount
-      : currentBalance + transactionAmount;
-
     await this.dbObject.db.transaction(async (tx) => {
-      await tx
-        .update(expTransactions)
-        .set({ exp_ts_deleted_at: null })
-        .where(eq(expTransactions.exp_ts_id, id))
-        .returning();
+      const rows = await this.getGroupRows(tx, existingTransaction, userId, true);
 
-      await tx
-        .update(expBankAccounts)
-        .set({
-          exp_ba_balance: updatedBalance.toFixed(2),
-        })
-        .where(eq(expBankAccounts.exp_ba_id, accountId))
-        .returning();
+      for (const row of rows) {
+        const accountId = row.exp_ts_bank_account_id;
+
+        const account = await tx.query.expBankAccounts.findFirst({
+          where: (expBankAccounts, { eq }) =>
+            and(eq(expBankAccounts.exp_ba_id, accountId), eq(expBankAccounts.exp_ba_is_active, 1)),
+        });
+
+        if (!account) {
+          throw new Error('Bank account not found or inactive');
+        }
+
+        const currentBalance = parseFloat(account.exp_ba_balance);
+        const transactionAmount = parseFloat(row.exp_ts_amount);
+
+        // Inverse of deleteTransaction's adjustment above
+        const updatedBalance = this.isOutflow(row)
+          ? currentBalance - transactionAmount
+          : currentBalance + transactionAmount;
+
+        await tx
+          .update(expTransactions)
+          .set({ exp_ts_deleted_at: null })
+          .where(eq(expTransactions.exp_ts_id, row.exp_ts_id));
+
+        await tx
+          .update(expBankAccounts)
+          .set({ exp_ba_balance: updatedBalance.toFixed(2) })
+          .where(eq(expBankAccounts.exp_ba_id, accountId));
+      }
     });
 
     return true;
@@ -645,9 +831,30 @@ export class ExpensifyTransactionsRepository {
       throw new Error('Transaction not found');
     }
 
-    await this.dbObject.db.delete(expTransactions).where(eq(expTransactions.exp_ts_id, id));
+    // Purge is balance-neutral (already adjusted at soft-delete time), so
+    // no db.transaction/balance math is needed here - just hard-delete every
+    // row in the transfer group together, same as a lone transaction.
+    const rows = existingTransaction.exp_ts_transfer_group_id
+      ? await this.dbObject.db.query.expTransactions.findMany({
+          where: (expTransactions, { eq, and }) =>
+            and(
+              eq(
+                expTransactions.exp_ts_transfer_group_id,
+                existingTransaction.exp_ts_transfer_group_id,
+              ),
+              eq(expTransactions.exp_ts_user_id, userId),
+            ),
+        })
+      : [existingTransaction];
 
-    return { attachmentUrl: existingTransaction.exp_ts_attachment_url };
+    await this.dbObject.db.delete(expTransactions).where(
+      inArray(
+        expTransactions.exp_ts_id,
+        rows.map((row) => row.exp_ts_id),
+      ),
+    );
+
+    return { attachmentUrls: rows.map((row) => row.exp_ts_attachment_url).filter(Boolean) };
   }
 
   async getTrashedTransactions(userId: string) {
@@ -668,6 +875,8 @@ export class ExpensifyTransactionsRepository {
         exp_tt_id: expTransactionTypes.exp_tt_id,
         exp_ba_id: expBankAccounts.exp_ba_id,
         exp_ba_name: expBankAccounts.exp_ba_name,
+        exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
       })
       .from(expTransactions)
       .innerJoin(
