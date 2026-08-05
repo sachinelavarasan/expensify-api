@@ -427,6 +427,7 @@ export class ExpensifyTransactionsRepository {
       startDate?: string;
       endDate?: string;
       accountId?: string;
+      accountIds?: string[];
       transaction_type?: number;
       transaction_label?: string;
       minAmount?: string;
@@ -445,7 +446,9 @@ export class ExpensifyTransactionsRepository {
         lt(expTransactions.exp_ts_date, args.endDate),
       );
     }
-    if (args.accountId) {
+    if (args.accountIds?.length) {
+      conditions.push(inArray(expTransactions.exp_ts_bank_account_id, args.accountIds));
+    } else if (args.accountId) {
       conditions.push(eq(expTransactions.exp_ts_bank_account_id, args.accountId));
     }
     if (args.transaction_type) {

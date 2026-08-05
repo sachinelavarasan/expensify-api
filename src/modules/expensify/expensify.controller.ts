@@ -387,11 +387,15 @@ export class ExpensifyController {
     return this.expensifyService.reorderCategories(dto, exp_us_id);
   }
   @Delete('categories/:id')
-  async delete(@Req() req: ExpressWithUser, @Param('id') id: string) {
+  async delete(
+    @Req() req: ExpressWithUser,
+    @Param('id') id: string,
+    @Body() body: { targetCategoryId?: string },
+  ) {
     const {
       user: { exp_us_id },
     } = req;
-    return this.expensifyService.deleteCategory(id, exp_us_id);
+    return this.expensifyService.deleteCategory(id, exp_us_id, body?.targetCategoryId);
   }
 
   @Post('ai/suggest-category')
@@ -538,11 +542,13 @@ export class ExpensifyController {
       endDate,
       format = 'xlsx',
       transaction_type = 'all',
+      accountIds,
     } = query as {
       startDate: string;
       endDate: string;
       format?: 'xlsx' | 'csv';
       transaction_type?: 'all' | 'income' | 'expense' | 'transfer';
+      accountIds?: string;
     };
 
     const transactions = await this.expensifyService.getAllTransactions(exp_us_id, {
@@ -558,6 +564,7 @@ export class ExpensifyController {
             : transaction_type === 'transfer'
               ? 3
               : undefined,
+      accountIds: accountIds ? accountIds.split(',') : undefined,
     });
 
     if (!transactions || transactions.length === 0) {
@@ -629,11 +636,13 @@ export class ExpensifyController {
       startDate,
       endDate,
       transaction_type = 'all',
+      accountIds,
     } = query as {
       startDate: string;
       endDate: string;
       format?: 'xlsx' | 'csv';
       transaction_type?: 'all' | 'income' | 'expense' | 'transfer';
+      accountIds?: string;
     };
 
     const transactions = await this.expensifyService.getAllTransactions(exp_us_id, {
@@ -649,6 +658,7 @@ export class ExpensifyController {
             : transaction_type === 'transfer'
               ? 3
               : undefined,
+      accountIds: accountIds ? accountIds.split(',') : undefined,
     });
 
     if (!transactions || transactions.length === 0) {

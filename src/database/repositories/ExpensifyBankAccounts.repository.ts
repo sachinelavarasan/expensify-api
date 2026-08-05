@@ -1,5 +1,5 @@
 import { Inject } from '@nestjs/common';
-import { and, asc, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
@@ -86,26 +86,35 @@ export class ExpensifyBankAccountRepository {
   }
 
   async deleteBankAccount(id: string, userId: string) {
-    // Blocks deleting an account that has active transfer history, rather
-    // than cascading the delete to the linked leg living on the other
-    // account - that account wasn't the one the user asked to touch.
-    const activeTransfer = await this.dbObject.db.query.expTransactions.findFirst({
-      where: (expTransactions, { eq, and }) =>
-        and(
-          eq(expTransactions.exp_ts_bank_account_id, id),
-          eq(expTransactions.exp_ts_user_id, userId),
-          isNotNull(expTransactions.exp_ts_transfer_group_id),
-          isNull(expTransactions.exp_ts_deleted_at),
-        ),
-    });
-
-    if (activeTransfer) {
-      throw new Error(
-        'Cannot delete an account with existing transfer history. Delete those transfers first.',
-      );
-    }
-
     await this.dbObject.db.transaction(async (tx) => {
+      const current = await tx.query.expBankAccounts.findFirst({
+        where: (accounts, { eq, and }) =>
+          and(eq(accounts.exp_ba_id, id), eq(accounts.exp_ba_user_id, userId)),
+      });
+
+      if (!current) {
+        throw new Error('Bank account not found');
+      }
+
+      // Blocks deleting an account that has active transfer history, rather
+      // than cascading the delete to the linked leg living on the other
+      // account - that account wasn't the one the user asked to touch.
+      const activeTransfer = await tx.query.expTransactions.findFirst({
+        where: (expTransactions, { eq, and }) =>
+          and(
+            eq(expTransactions.exp_ts_bank_account_id, id),
+            eq(expTransactions.exp_ts_user_id, userId),
+            isNotNull(expTransactions.exp_ts_transfer_group_id),
+            isNull(expTransactions.exp_ts_deleted_at),
+          ),
+      });
+
+      if (activeTransfer) {
+        throw new Error(
+          'Cannot delete an account with existing transfer history. Delete those transfers first.',
+        );
+      }
+
       await tx.delete(expBankAccounts).where(eq(expBankAccounts.exp_ba_id, id));
       await tx
         .delete(expTransactions)
@@ -116,6 +125,24 @@ export class ExpensifyBankAccountRepository {
           ),
         )
         .returning();
+
+      // The deleted account was primary - promote the user's most recently
+      // created remaining account so they aren't left without one.
+      if (current.exp_ba_is_primary) {
+        const [nextPrimary] = await tx
+          .select()
+          .from(expBankAccounts)
+          .where(eq(expBankAccounts.exp_ba_user_id, userId))
+          .orderBy(desc(expBankAccounts.exp_ba_created_at))
+          .limit(1);
+
+        if (nextPrimary) {
+          await tx
+            .update(expBankAccounts)
+            .set({ exp_ba_is_primary: true })
+            .where(eq(expBankAccounts.exp_ba_id, nextPrimary.exp_ba_id));
+        }
+      }
     });
 
     return true;

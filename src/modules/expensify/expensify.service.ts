@@ -58,6 +58,7 @@ export class ExpensifyService {
       transaction_type?: number;
       transaction_label?: string;
       accountId?: string;
+      accountIds?: string[];
       minAmount?: string;
       maxAmount?: string;
       categoryIds?: string[];
@@ -258,8 +259,12 @@ export class ExpensifyService {
       id: id,
     });
   }
-  async deleteCategory(id: string, userId: string) {
-    return await this.expensifyTransactionsCategoryRepository.deleteCategory(id, userId);
+  async deleteCategory(id: string, userId: string, targetCategoryId?: string) {
+    return await this.expensifyTransactionsCategoryRepository.deleteCategory(
+      id,
+      userId,
+      targetCategoryId,
+    );
   }
   acceptPushNotification = async (us_id: string, data: { token: string }) => {
     try {
