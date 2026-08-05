@@ -9,6 +9,7 @@ import {
   CreateRecurringTransactionDto,
   CreateRepaymentDto,
   CreateStarredTransactionDto,
+  CreateTransferDto,
   TransactionDto,
   UpdateBudgetDto,
   UpdateDebtDto,
@@ -57,6 +58,7 @@ export class ExpensifyService {
       transaction_type?: number;
       transaction_label?: string;
       accountId?: string;
+      accountIds?: string[];
       minAmount?: string;
       maxAmount?: string;
       categoryIds?: string[];
@@ -138,14 +140,17 @@ export class ExpensifyService {
     return await this.expensifyTransactionsRepository.restoreTransaction(id, userId);
   }
   async purgeTransaction(id: string, userId: string) {
-    const { attachmentUrl } = await this.expensifyTransactionsRepository.purgeTransaction(
+    const { attachmentUrls } = await this.expensifyTransactionsRepository.purgeTransaction(
       id,
       userId,
     );
-    if (attachmentUrl) {
+    for (const attachmentUrl of attachmentUrls) {
       await this.storageService.deleteTransactionAttachment(attachmentUrl);
     }
     return true;
+  }
+  async createTransfer(dto: CreateTransferDto) {
+    return await this.expensifyTransactionsRepository.createTransfer(dto);
   }
   async getTrashedTransactions(userId: string) {
     return await this.expensifyTransactionsRepository.getTrashedTransactions(userId);
@@ -254,8 +259,12 @@ export class ExpensifyService {
       id: id,
     });
   }
-  async deleteCategory(id: string, userId: string) {
-    return await this.expensifyTransactionsCategoryRepository.deleteCategory(id, userId);
+  async deleteCategory(id: string, userId: string, targetCategoryId?: string) {
+    return await this.expensifyTransactionsCategoryRepository.deleteCategory(
+      id,
+      userId,
+      targetCategoryId,
+    );
   }
   acceptPushNotification = async (us_id: string, data: { token: string }) => {
     try {

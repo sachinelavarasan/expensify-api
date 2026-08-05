@@ -47,6 +47,43 @@ export class TransactionDto {
   exp_ts_bank_account_id: string;
 }
 
+export class CreateTransferDto {
+  @IsString()
+  @IsNotEmpty()
+  exp_ts_title!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d+(\.\d{1,2})?$/, { message: 'Amount must be a valid number string' })
+  exp_ts_amount!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be in YYYY-MM-DD format' })
+  exp_ts_date!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[0-2][0-9]:[0-5][0-9]$/, {
+    message: 'Time must be in HH:MM format',
+  })
+  exp_ts_time!: string;
+
+  @IsOptional()
+  @IsString()
+  exp_ts_note?: string | null;
+
+  @IsString()
+  @IsNotEmpty()
+  exp_ts_from_bank_account_id!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  exp_ts_to_bank_account_id!: string;
+
+  exp_ts_user_id: string;
+}
+
 export class CreateBankAccountDto {
   exp_ba_name: string;
   exp_ba_balance: string;

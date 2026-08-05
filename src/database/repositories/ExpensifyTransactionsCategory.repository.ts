@@ -153,34 +153,65 @@ export class ExpensifyTransactionsCategoryRepository {
     });
   }
 
-  async deleteCategory(id: string, userId: string): Promise<void> {
+  async deleteCategory(id: string, userId: string, targetCategoryId?: string): Promise<void> {
     await this.dbObject.db.transaction(async (tx) => {
-      const current = await this.getOne({ id });
+      const current = await tx.query.expTransactionCategories.findFirst({
+        where: (categories, { eq }) => eq(categories.exp_tc_id, id),
+      });
       if (!current || current.exp_tc_user_id !== userId) {
         throw new NotFoundException(`Category with ID ${id} not found`);
       }
-      const othersCategory = await tx
-        .select()
-        .from(expTransactionCategories)
-        .where(
-          and(
-            eq(expTransactionCategories.exp_tc_label, 'Others'),
-            isNull(expTransactionCategories.exp_tc_user_id),
-            eq(expTransactionCategories.exp_tc_transaction_type, current.exp_tc_transaction_type),
-          ),
-        )
-        .limit(1);
 
-      if (!othersCategory.length) {
-        throw new Error(`'Others' category not found`);
+      // Caller may name an explicit reassignment target (must be a real,
+      // same-type category the caller can actually see - not the category
+      // being deleted itself). Anything that doesn't check out falls back to
+      // the global 'Others' category for that transaction type, same as
+      // before this was configurable.
+      let reassignCategoryId: string | null = null;
+      if (targetCategoryId && targetCategoryId !== id) {
+        const [target] = await tx
+          .select()
+          .from(expTransactionCategories)
+          .where(
+            and(
+              eq(expTransactionCategories.exp_tc_id, targetCategoryId),
+              eq(expTransactionCategories.exp_tc_transaction_type, current.exp_tc_transaction_type),
+              or(
+                eq(expTransactionCategories.exp_tc_user_id, userId),
+                isNull(expTransactionCategories.exp_tc_user_id),
+              ),
+            ),
+          )
+          .limit(1);
+        if (target) {
+          reassignCategoryId = target.exp_tc_id;
+        }
       }
 
-      const othersCategoryId = othersCategory[0].exp_tc_id;
+      if (!reassignCategoryId) {
+        const othersCategory = await tx
+          .select()
+          .from(expTransactionCategories)
+          .where(
+            and(
+              eq(expTransactionCategories.exp_tc_label, 'Others'),
+              isNull(expTransactionCategories.exp_tc_user_id),
+              eq(expTransactionCategories.exp_tc_transaction_type, current.exp_tc_transaction_type),
+            ),
+          )
+          .limit(1);
+
+        if (!othersCategory.length) {
+          throw new Error(`'Others' category not found`);
+        }
+
+        reassignCategoryId = othersCategory[0].exp_tc_id;
+      }
 
       await tx
         .update(expTransactions)
         .set({
-          exp_ts_category: othersCategoryId,
+          exp_ts_category: reassignCategoryId,
         })
         .where(eq(expTransactions.exp_ts_category, id));
 
