@@ -422,6 +422,9 @@ export class ExpensifyService {
   async deleteBudget(id: string, userId: string) {
     return await this.expensifyBudgetRepository.removeBudget(id, userId);
   }
+  async copyPreviousMonthBudgets(userId: string, date: string) {
+    return await this.expensifyBudgetRepository.copyPreviousMonthBudgets(userId, date);
+  }
 
   async getRecurringTransactions(userId: string) {
     return await this.recurringTransactionsRepository.getAllForUser(userId);

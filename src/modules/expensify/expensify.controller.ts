@@ -28,6 +28,7 @@ import {
 import {
   CreateBankAccountDto,
   CreateBudgetDto,
+  CopyPreviousMonthBudgetsDto,
   CreateDebtDto,
   CreateRecurringTransactionDto,
   CreateRepaymentDto,
@@ -1151,6 +1152,26 @@ export class ExpensifyController {
       user: { exp_us_id },
     } = req;
     return this.expensifyService.deleteBudget(id, exp_us_id);
+  }
+  @Post('budgets/copy-previous-month')
+  async copyPreviousMonthBudgets(
+    @Body() dto: CopyPreviousMonthBudgetsDto,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const result = await this.expensifyService.copyPreviousMonthBudgets(
+        exp_us_id,
+        dto.exp_bg_date,
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: error.message });
+    }
   }
 
   @Get('recurring-transactions')

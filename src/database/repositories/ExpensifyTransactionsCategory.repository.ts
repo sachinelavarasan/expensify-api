@@ -7,6 +7,7 @@ import { Database } from '../types/Database';
 import {
   expTransactionCategories,
   expTransactions,
+  expRecurringTransactions,
   InsertExpensifyTransactionCategories,
   SelectExpensifyTransactionCategories,
 } from '../schemas/schema';
@@ -214,6 +215,13 @@ export class ExpensifyTransactionsCategoryRepository {
           exp_ts_category: reassignCategoryId,
         })
         .where(eq(expTransactions.exp_ts_category, id));
+
+      await tx
+        .update(expRecurringTransactions)
+        .set({
+          exp_rt_category_id: reassignCategoryId,
+        })
+        .where(eq(expRecurringTransactions.exp_rt_category_id, id));
 
       await tx
         .delete(expTransactionCategories)

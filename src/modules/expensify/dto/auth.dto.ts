@@ -114,6 +114,10 @@ export class UpdateBudgetDto {
   exp_bg_amount: number;
 }
 
+export class CopyPreviousMonthBudgetsDto {
+  exp_bg_date: string;
+}
+
 export class CreateRecurringTransactionDto {
   @IsString()
   @IsNotEmpty()
