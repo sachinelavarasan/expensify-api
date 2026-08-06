@@ -102,6 +102,7 @@ export class ExpensifyTransactionsCategoryRepository {
         expTransactions,
         and(
           eq(expTransactionCategories.exp_tc_id, expTransactions.exp_ts_category),
+          eq(expTransactions.exp_ts_user_id, id),
           isNull(expTransactions.exp_ts_deleted_at),
         ),
       )
