@@ -11,9 +11,11 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
@@ -32,6 +34,14 @@ import { CreateTransferDto, TransactionDto } from '../../modules/expensify/dto/a
 import { ExpStarredTransactionsRepository } from './ExpStarredTransactions.repository';
 import { normalizeTransactionTitle } from '../../common/utils/normalize-title.util';
 
+// Self-join aliases used to pull in the *other* leg's bank account name for
+// transfer rows - a transfer is stored as two separate exp_transactions rows
+// (one per account) sharing exp_ts_transfer_group_id, so a row only knows its
+// own account unless it's joined back to its counterpart. Stateless aliases,
+// safe to reuse across every query below.
+const counterpartTransaction = alias(expTransactions, 'counterpart_tx');
+const counterpartAccount = alias(expBankAccounts, 'counterpart_account');
+
 export class ExpensifyTransactionsRepository {
   constructor(
     @Inject(DB)
@@ -40,7 +50,7 @@ export class ExpensifyTransactionsRepository {
   ) {}
 
   async getOne(id: string, userId: string) {
-    return await this.dbObject.db
+    const [row] = await this.dbObject.db
       .select({
         exp_ts_id: expTransactions.exp_ts_id,
         exp_ts_title: expTransactions.exp_ts_title,
@@ -85,6 +95,49 @@ export class ExpensifyTransactionsRepository {
         ),
       )
       .limit(1);
+
+    if (!row) {
+      return [];
+    }
+
+    // A transfer leg only carries its own account - the "delete & recreate"
+    // edit flow needs both sides (from/to) to prefill a fresh transfer form,
+    // so look up the sibling leg sharing the same transfer_group_id and
+    // derive from/to off each row's exp_ts_transfer_direction.
+    if (!row.exp_ts_transfer_group_id) {
+      return [row];
+    }
+
+    const siblingRows = await this.dbObject.db
+      .select({
+        exp_ts_id: expTransactions.exp_ts_id,
+        exp_ts_bank_account_id: expTransactions.exp_ts_bank_account_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
+      })
+      .from(expTransactions)
+      .where(
+        and(
+          eq(expTransactions.exp_ts_transfer_group_id, row.exp_ts_transfer_group_id),
+          eq(expTransactions.exp_ts_user_id, userId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      );
+
+    const sibling = siblingRows.find((r) => r.exp_ts_id !== row.exp_ts_id);
+    if (!sibling) {
+      return [row];
+    }
+
+    const outLeg = row.exp_ts_transfer_direction === 'out' ? row : sibling;
+    const inLeg = row.exp_ts_transfer_direction === 'in' ? row : sibling;
+
+    return [
+      {
+        ...row,
+        exp_ts_from_bank_account_id: outLeg.exp_ts_bank_account_id,
+        exp_ts_to_bank_account_id: inLeg.exp_ts_bank_account_id,
+      },
+    ];
   }
   async createTransaction(data: TransactionDto) {
     const isStarred = data.exp_st_id;
@@ -490,6 +543,7 @@ export class ExpensifyTransactionsRepository {
         exp_st_id: expStarredTransactions.exp_st_id,
         exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
         exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
+        exp_ts_transfer_counterpart_account_name: counterpartAccount.exp_ba_name,
       })
       .from(expTransactions)
       .innerJoin(
@@ -507,6 +561,20 @@ export class ExpensifyTransactionsRepository {
       .leftJoin(
         expStarredTransactions,
         eq(expTransactions.exp_ts_id, expStarredTransactions.exp_st_transaction_id),
+      )
+      .leftJoin(
+        counterpartTransaction,
+        and(
+          eq(
+            counterpartTransaction.exp_ts_transfer_group_id,
+            expTransactions.exp_ts_transfer_group_id,
+          ),
+          ne(counterpartTransaction.exp_ts_id, expTransactions.exp_ts_id),
+        ),
+      )
+      .leftJoin(
+        counterpartAccount,
+        eq(counterpartTransaction.exp_ts_bank_account_id, counterpartAccount.exp_ba_id),
       )
       .orderBy(desc(expTransactions.exp_ts_date), desc(expTransactions.exp_ts_created_at))
       .where(and(...conditions));
@@ -561,6 +629,7 @@ export class ExpensifyTransactionsRepository {
         exp_ba_name: expBankAccounts.exp_ba_name,
         exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
         exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
+        exp_ts_transfer_counterpart_account_name: counterpartAccount.exp_ba_name,
       })
       .from(expTransactions)
       .innerJoin(
@@ -574,6 +643,20 @@ export class ExpensifyTransactionsRepository {
       .innerJoin(
         expTransactionCategories,
         eq(expTransactions.exp_ts_category, expTransactionCategories.exp_tc_id),
+      )
+      .leftJoin(
+        counterpartTransaction,
+        and(
+          eq(
+            counterpartTransaction.exp_ts_transfer_group_id,
+            expTransactions.exp_ts_transfer_group_id,
+          ),
+          ne(counterpartTransaction.exp_ts_id, expTransactions.exp_ts_id),
+        ),
+      )
+      .leftJoin(
+        counterpartAccount,
+        eq(counterpartTransaction.exp_ts_bank_account_id, counterpartAccount.exp_ba_id),
       )
       .where(
         and(
@@ -880,6 +963,7 @@ export class ExpensifyTransactionsRepository {
         exp_ba_name: expBankAccounts.exp_ba_name,
         exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
         exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
+        exp_ts_transfer_counterpart_account_name: counterpartAccount.exp_ba_name,
       })
       .from(expTransactions)
       .innerJoin(
@@ -893,6 +977,20 @@ export class ExpensifyTransactionsRepository {
       .innerJoin(
         expTransactionCategories,
         eq(expTransactions.exp_ts_category, expTransactionCategories.exp_tc_id),
+      )
+      .leftJoin(
+        counterpartTransaction,
+        and(
+          eq(
+            counterpartTransaction.exp_ts_transfer_group_id,
+            expTransactions.exp_ts_transfer_group_id,
+          ),
+          ne(counterpartTransaction.exp_ts_id, expTransactions.exp_ts_id),
+        ),
+      )
+      .leftJoin(
+        counterpartAccount,
+        eq(counterpartTransaction.exp_ts_bank_account_id, counterpartAccount.exp_ba_id),
       )
       .where(
         and(

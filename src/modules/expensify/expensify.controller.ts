@@ -101,7 +101,7 @@ export class ExpensifyController {
                 ? 3
                 : undefined,
         transaction_label: search ? search : undefined,
-        accountId: account ? account : undefined,
+        accountIds: account ? account.split(',') : undefined,
         minAmount: minAmount ? minAmount : undefined,
         maxAmount: maxAmount ? maxAmount : undefined,
         categoryIds: categories ? categories.split(',') : undefined,

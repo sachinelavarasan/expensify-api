@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, ne } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DB } from '../database.constants';
 import { Database } from '../types/Database';
 import {
@@ -10,6 +11,12 @@ import {
   expBankAccounts,
 } from '../schemas/schema';
 import { CreateStarredTransactionDto } from '../../modules/expensify/dto/auth.dto';
+
+// Same self-join pattern as ExpensifyTransactionsRepository - a transfer's
+// two legs are separate rows sharing exp_ts_transfer_group_id, so the other
+// account's name only comes from joining a row back to its counterpart.
+const counterpartTransaction = alias(expTransactions, 'counterpart_tx');
+const counterpartAccount = alias(expBankAccounts, 'counterpart_account');
 
 @Injectable()
 export class ExpStarredTransactionsRepository {
@@ -115,6 +122,9 @@ export class ExpStarredTransactionsRepository {
         exp_tc_icon_bg_color: expTransactionCategories.exp_tc_icon_bg_color,
         exp_ba_id: expBankAccounts.exp_ba_id,
         exp_ba_name: expBankAccounts.exp_ba_name,
+        exp_ts_transfer_group_id: expTransactions.exp_ts_transfer_group_id,
+        exp_ts_transfer_direction: expTransactions.exp_ts_transfer_direction,
+        exp_ts_transfer_counterpart_account_name: counterpartAccount.exp_ba_name,
       })
       .from(expStarredTransactions)
       .innerJoin(
@@ -132,6 +142,20 @@ export class ExpStarredTransactionsRepository {
       .innerJoin(
         expTransactionTypes,
         eq(expTransactions.exp_ts_transaction_type, expTransactionTypes.exp_tt_id),
+      )
+      .leftJoin(
+        counterpartTransaction,
+        and(
+          eq(
+            counterpartTransaction.exp_ts_transfer_group_id,
+            expTransactions.exp_ts_transfer_group_id,
+          ),
+          ne(counterpartTransaction.exp_ts_id, expTransactions.exp_ts_id),
+        ),
+      )
+      .leftJoin(
+        counterpartAccount,
+        eq(counterpartTransaction.exp_ts_bank_account_id, counterpartAccount.exp_ba_id),
       )
       .where(
         and(
