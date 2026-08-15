@@ -8,19 +8,19 @@
   actions:
     # Replaced Docker container with a high-speed native HTTP trigger
     - action: "Trigger recurring-transactions cron"
-      type: "WEBHOOK"
-      url: "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
+      type: "HTTP"
+      notification_url: "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
       method: "POST"
       headers:
-        - key: "x-cron-token"
+        - name: "x-cron-token"
           value: "$CRON_SECRET_TOKEN"
-        - key: "Content-Type"
+        - name: "Content-Type"
           value: "application/json"
-      
-      # Alerts you instantly if the Vercel cleanup script fails (4xx/5xx errors)
-      on_failure:
-        - action: "Notify Failure on Discord"
-          type: "DISCORD"
-          content: "❌ **Cron Job Failed:** The monthly recurring transactions reminder and stale-token cleanup failed on Vercel."
-          webhook_url: "$DISCORD_WEBHOOK_URL"
+
+    # Alerts you instantly if the request above fails (4xx/5xx or timeout)
+    - action: "Notify Failure on Discord"
+      type: "DISCORD"
+      trigger_time: "ON_FAILURE"
+      content: "❌ **Cron Job Failed:** The monthly recurring transactions reminder and stale-token cleanup failed on Vercel."
+      webhook_url: "$DISCORD_WEBHOOK_URL"
 
