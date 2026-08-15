@@ -10,7 +10,7 @@
     - action: "Trigger recurring-transactions cron"
       type: "HTTP"
       notification_url: "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
-      method: "POST"
+      method: "GET"
       headers:
         - name: "x-cron-token"
           value: "$CRON_SECRET_TOKEN"
