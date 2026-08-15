@@ -12,18 +12,3 @@
       docker_image_tag: "latest"
       execute_commands:
         - curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
-
-- pipeline: "purge-trash-cron"
-  refs:
-    - "refs/heads/main"
-  events:
-    - type: "SCHEDULE"
-      cron: "0 8 1 * *" # trash purge (08:00 UTC on the 1st of each month)
-      timezone: "Etc/UTC"
-  actions:
-    - action: "Trigger purge-trash cron"
-      type: "BUILD"
-      docker_image_name: "curlimages/curl"
-      docker_image_tag: "latest"
-      execute_commands:
-        - curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/purge-trash"
