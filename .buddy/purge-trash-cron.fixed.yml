@@ -1,4 +1,4 @@
-- pipeline: "purge-trash-cron"
+- pipeline: "purge trash cron pipeline"
   refs:
     - "refs/heads/main"
   events:
@@ -6,9 +6,20 @@
       cron: "0 8 1 * *" # trash purge (08:00 UTC on the 1st of each month)
       timezone: "Etc/UTC"
   actions:
+    # Uses native HTTP client instead of a slow Docker container
     - action: "Trigger purge-trash cron"
-      type: "BUILD"
-      docker_image_name: "curlimages/curl"
-      docker_image_tag: "latest"
-      execute_commands:
-        - curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/purge-trash"
+      type: "WEBHOOK"
+      url: "https://expensify-api-delta.vercel.app/crons/purge-trash"
+      method: "POST"
+      headers:
+        - key: "x-cron-token"
+          value: "$CRON_SECRET_TOKEN"
+        - key: "Content-Type"
+          value: "application/json"
+      
+      # Fires automatically if Vercel returns an error code (4xx or 5xx)
+      on_failure:
+        - action: "Notify Failure on Discord"
+          type: "DISCORD"
+          content: "❌ **Cron Job Failed:** The monthly trash purge failed on Vercel. Check Buddy logs for details."
+          webhook_url: "$DISCORD_WEBHOOK_URL"
