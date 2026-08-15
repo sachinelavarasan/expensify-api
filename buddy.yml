@@ -1,11 +1,10 @@
 - pipeline: "recurring-transactions-cron"
-  trigger_mode: "SCHEDULED"
-  trigger_conditions:
-    - trigger_condition: "CRON"
-      cron_pattern: "0 10 2 * *" # recurring-transactions reminder + stale-token cleanup (10:00 UTC on the 2nd of each month)
-      zone_id: "Etc/UTC"
-  ref_name: "main"
-  ref_type: "BRANCH"
+  refs:
+    - "refs/heads/main"
+  events:
+    - type: "SCHEDULE"
+      cron: "0 10 2 * *" # recurring-transactions reminder + stale-token cleanup (10:00 UTC on the 2nd of each month)
+      timezone: "Etc/UTC"
   actions:
     - action: "Trigger recurring-transactions cron"
       type: "BUILD"
@@ -15,13 +14,12 @@
         - curl -sf -H "x-cron-token: $CRON_SECRET_TOKEN" "https://expensify-api-delta.vercel.app/crons/recurring-transactions"
 
 - pipeline: "purge-trash-cron"
-  trigger_mode: "SCHEDULED"
-  trigger_conditions:
-    - trigger_condition: "CRON"
-      cron_pattern: "0 8 1 * *" # trash purge (08:00 UTC on the 1st of each month)
-      zone_id: "Etc/UTC"
-  ref_name: "main"
-  ref_type: "BRANCH"
+  refs:
+    - "refs/heads/main"
+  events:
+    - type: "SCHEDULE"
+      cron: "0 8 1 * *" # trash purge (08:00 UTC on the 1st of each month)
+      timezone: "Etc/UTC"
   actions:
     - action: "Trigger purge-trash cron"
       type: "BUILD"
