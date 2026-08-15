@@ -16,10 +16,3 @@
           value: "$CRON_SECRET_TOKEN"
         - name: "Content-Type"
           value: "application/json"
-
-    # Fires automatically if the request above fails (4xx/5xx or timeout)
-    - action: "Notify Failure on Discord"
-      type: "DISCORD"
-      trigger_time: "ON_FAILURE"
-      content: "❌ **Cron Job Failed:** The monthly trash purge failed on Vercel. Check Buddy logs for details."
-      webhook_url: "$DISCORD_WEBHOOK_URL"
