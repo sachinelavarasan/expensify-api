@@ -106,6 +106,10 @@ export const expTransactions = pgTable('exp_transactions', {
     .default(sql`'{}'::text[]`),
 
   exp_ts_attachment_url: text('exp_ts_attachment_url'),
+
+  exp_ts_transfer_group_id: uuid('exp_ts_transfer_group_id').default(null),
+
+  exp_ts_transfer_direction: text('exp_ts_transfer_direction').default(null),
 });
 
 export type InsertExpensifyTransactions = InferInsertModel<typeof expTransactions>;

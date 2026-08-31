@@ -28,10 +28,12 @@ import {
 import {
   CreateBankAccountDto,
   CreateBudgetDto,
+  CopyPreviousMonthBudgetsDto,
   CreateDebtDto,
   CreateRecurringTransactionDto,
   CreateRepaymentDto,
   CreateStarredTransactionDto,
+  CreateTransferDto,
   ImportRecurringTransactionsDto,
   TransactionDto,
   UpdateBankAccountDto,
@@ -73,7 +75,7 @@ export class ExpensifyController {
       } = query as {
         startDate: string;
         endDate: string;
-        transaction_type?: 'all' | 'income' | 'expense';
+        transaction_type?: 'all' | 'income' | 'expense' | 'transfer';
         search?: string;
         account: string;
         minAmount?: string;
@@ -91,9 +93,15 @@ export class ExpensifyController {
         startDate,
         endDate,
         transaction_type:
-          transaction_type === 'income' ? 2 : transaction_type === 'expense' ? 1 : undefined,
+          transaction_type === 'income'
+            ? 2
+            : transaction_type === 'expense'
+              ? 1
+              : transaction_type === 'transfer'
+                ? 3
+                : undefined,
         transaction_label: search ? search : undefined,
-        accountId: account ? account : undefined,
+        accountIds: account ? account.split(',') : undefined,
         minAmount: minAmount ? minAmount : undefined,
         maxAmount: maxAmount ? maxAmount : undefined,
         categoryIds: categories ? categories.split(',') : undefined,
@@ -163,6 +171,32 @@ export class ExpensifyController {
 
       const insertBody = body;
       await this.expensifyService.createTransaction(insertBody);
+      return res.status(200).json({ message: 'Successfully added' });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+  @Post('transactions/transfer')
+  async createTransfer(
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+    @Body() body: CreateTransferDto,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      body.exp_ts_user_id = exp_us_id;
+
+      if (!body.exp_ts_from_bank_account_id || !body.exp_ts_to_bank_account_id) {
+        return res.status(400).json({
+          error:
+            'Missing required fields: exp_ts_from_bank_account_id or exp_ts_to_bank_account_id',
+        });
+      }
+
+      await this.expensifyService.createTransfer(body);
       return res.status(200).json({ message: 'Successfully added' });
     } catch (error) {
       console.log(error);
@@ -354,11 +388,15 @@ export class ExpensifyController {
     return this.expensifyService.reorderCategories(dto, exp_us_id);
   }
   @Delete('categories/:id')
-  async delete(@Req() req: ExpressWithUser, @Param('id') id: string) {
+  async delete(
+    @Req() req: ExpressWithUser,
+    @Param('id') id: string,
+    @Body() body: { targetCategoryId?: string },
+  ) {
     const {
       user: { exp_us_id },
     } = req;
-    return this.expensifyService.deleteCategory(id, exp_us_id);
+    return this.expensifyService.deleteCategory(id, exp_us_id, body?.targetCategoryId);
   }
 
   @Post('ai/suggest-category')
@@ -505,11 +543,13 @@ export class ExpensifyController {
       endDate,
       format = 'xlsx',
       transaction_type = 'all',
+      accountIds,
     } = query as {
       startDate: string;
       endDate: string;
       format?: 'xlsx' | 'csv';
-      transaction_type?: 'all' | 'income' | 'expense';
+      transaction_type?: 'all' | 'income' | 'expense' | 'transfer';
+      accountIds?: string;
     };
 
     const transactions = await this.expensifyService.getAllTransactions(exp_us_id, {
@@ -518,7 +558,14 @@ export class ExpensifyController {
       // to include transactions dated on endDate itself (e.g. "today").
       endDate: moment(endDate).add(1, 'day').format('YYYY-MM-DD'),
       transaction_type:
-        transaction_type === 'income' ? 2 : transaction_type === 'expense' ? 1 : undefined,
+        transaction_type === 'income'
+          ? 2
+          : transaction_type === 'expense'
+            ? 1
+            : transaction_type === 'transfer'
+              ? 3
+              : undefined,
+      accountIds: accountIds ? accountIds.split(',') : undefined,
     });
 
     if (!transactions || transactions.length === 0) {
@@ -590,11 +637,13 @@ export class ExpensifyController {
       startDate,
       endDate,
       transaction_type = 'all',
+      accountIds,
     } = query as {
       startDate: string;
       endDate: string;
       format?: 'xlsx' | 'csv';
-      transaction_type?: 'all' | 'income' | 'expense';
+      transaction_type?: 'all' | 'income' | 'expense' | 'transfer';
+      accountIds?: string;
     };
 
     const transactions = await this.expensifyService.getAllTransactions(exp_us_id, {
@@ -603,7 +652,14 @@ export class ExpensifyController {
       // to include transactions dated on endDate itself (e.g. "today").
       endDate: moment(endDate).add(1, 'day').format('YYYY-MM-DD'),
       transaction_type:
-        transaction_type === 'income' ? 2 : transaction_type === 'expense' ? 1 : undefined,
+        transaction_type === 'income'
+          ? 2
+          : transaction_type === 'expense'
+            ? 1
+            : transaction_type === 'transfer'
+              ? 3
+              : undefined,
+      accountIds: accountIds ? accountIds.split(',') : undefined,
     });
 
     if (!transactions || transactions.length === 0) {
@@ -997,6 +1053,16 @@ export class ExpensifyController {
 
     if (!isValid) return res.status(400).json({ error: 'Required parameters missing' });
 
+    // Bulk import only ever produces ordinary income/expense rows - a
+    // transfer is a paired, dual-account, dual-balance-adjusted event that
+    // this single-row/single-account insert path has no way to represent
+    // correctly, so reject anything claiming to be type 3 outright rather
+    // than silently inserting a broken, un-paired "transfer" leg.
+    const hasTransferType = data.some((row) => Number(row['transaction_id']) === 3);
+    if (hasTransferType) {
+      return res.status(400).json({ error: 'Transfers cannot be bulk imported' });
+    }
+
     const processed: any = data.map((row) => {
       const parsed = moment(row['date'], 'DD/MM/YYYY HH:mm');
       const date = parsed.format('YYYY-MM-DD');
@@ -1086,6 +1152,26 @@ export class ExpensifyController {
       user: { exp_us_id },
     } = req;
     return this.expensifyService.deleteBudget(id, exp_us_id);
+  }
+  @Post('budgets/copy-previous-month')
+  async copyPreviousMonthBudgets(
+    @Body() dto: CopyPreviousMonthBudgetsDto,
+    @Req() req: ExpressWithUser,
+    @Res() res: Express.Response,
+  ) {
+    try {
+      const {
+        user: { exp_us_id },
+      } = req;
+      const result = await this.expensifyService.copyPreviousMonthBudgets(
+        exp_us_id,
+        dto.exp_bg_date,
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: error.message });
+    }
   }
 
   @Get('recurring-transactions')
