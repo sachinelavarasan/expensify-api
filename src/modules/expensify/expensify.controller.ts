@@ -434,7 +434,15 @@ export class ExpensifyController {
   }
 
   @Get('accounts/:id')
-  findOne(
+  findOne(@Req() req: ExpressWithUser, @Param('id') id: string) {
+    const {
+      user: { exp_us_id },
+    } = req;
+    return this.expensifyService.findAccount(id, exp_us_id);
+  }
+
+  @Get('accounts/:id/transactions')
+  findAccountTransactions(
     @Req() req: ExpressWithUser,
     @Param('id') id: string,
     @Query('page') page?: string,
@@ -446,7 +454,7 @@ export class ExpensifyController {
     const limitNum = Math.max(Number(limit) || 30, 1);
     const pageNum = Math.max(Number(page) || 1, 1);
     const offset = (pageNum - 1) * limitNum;
-    return this.expensifyService.findAccount(id, exp_us_id, limitNum, offset);
+    return this.expensifyService.findAccountTransactions(id, exp_us_id, limitNum, offset);
   }
 
   @Put('accounts/:id')

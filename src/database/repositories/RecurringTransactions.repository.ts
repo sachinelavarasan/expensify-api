@@ -37,6 +37,10 @@ export class RecurringTransactionsRepository {
         exp_rt_end_date: expRecurringTransactions.exp_rt_end_date,
         exp_rt_next_due_date: expRecurringTransactions.exp_rt_next_due_date,
         exp_rt_is_active: expRecurringTransactions.exp_rt_is_active,
+        exp_rt_reminder_enabled: expRecurringTransactions.exp_rt_reminder_enabled,
+        exp_rt_reminder_days_before: expRecurringTransactions.exp_rt_reminder_days_before,
+        exp_rt_reminder_time: expRecurringTransactions.exp_rt_reminder_time,
+        exp_rt_kind: expRecurringTransactions.exp_rt_kind,
         exp_tc_label: expTransactionCategories.exp_tc_label,
         exp_tc_icon: expTransactionCategories.exp_tc_icon,
         exp_tc_icon_bg_color: expTransactionCategories.exp_tc_icon_bg_color,
@@ -113,6 +117,7 @@ export class RecurringTransactionsRepository {
         exp_rt_frequency: expRecurringTransactions.exp_rt_frequency,
         exp_rt_end_date: expRecurringTransactions.exp_rt_end_date,
         exp_rt_next_due_date: expRecurringTransactions.exp_rt_next_due_date,
+        exp_rt_kind: expRecurringTransactions.exp_rt_kind,
       })
       .from(expRecurringTransactions)
       .where(

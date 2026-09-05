@@ -670,6 +670,40 @@ export class ExpensifyTransactionsRepository {
       .offset(offset);
   }
 
+  async getTransactionCountForAccount(userId: string, accountId: string): Promise<number> {
+    const [row] = await this.dbObject.db
+      .select({ count: sql<number>`count(*)` })
+      .from(expTransactions)
+      .where(
+        and(
+          eq(expTransactions.exp_ts_user_id, userId),
+          eq(expTransactions.exp_ts_bank_account_id, accountId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      );
+    return Number(row?.count ?? 0);
+  }
+
+  async getIncomeExpenseTotalsForAccount(
+    userId: string,
+    accountId: string,
+  ): Promise<{ income: number; expense: number }> {
+    const [row] = await this.dbObject.db
+      .select({
+        income: sql<string>`coalesce(sum(case when ${expTransactions.exp_ts_transaction_type} = 2 then ${expTransactions.exp_ts_amount}::numeric else 0 end), 0)`,
+        expense: sql<string>`coalesce(sum(case when ${expTransactions.exp_ts_transaction_type} = 1 then ${expTransactions.exp_ts_amount}::numeric else 0 end), 0)`,
+      })
+      .from(expTransactions)
+      .where(
+        and(
+          eq(expTransactions.exp_ts_user_id, userId),
+          eq(expTransactions.exp_ts_bank_account_id, accountId),
+          isNull(expTransactions.exp_ts_deleted_at),
+        ),
+      );
+    return { income: Number(row?.income ?? 0), expense: Number(row?.expense ?? 0) };
+  }
+
   // A transfer's balance reversal depends on the direction of that specific
   // leg rather than a plain expense/income binary: a transfer-out leg moved
   // money out of its own account (like an expense), a transfer-in leg moved

@@ -209,8 +209,11 @@ export class ExpensifyService {
   async findAllAccount(userId: string) {
     return await this.expensifyBankAccountRepository.getAllBankAccount(userId);
   }
-  async findAccount(accountId: string, userId: string, limit: number, offset: number) {
-    return await this.expensifyBankAccountRepository.getAccountDetailsWithGroupedTransactionsById(
+  async findAccount(accountId: string, userId: string) {
+    return await this.expensifyBankAccountRepository.getAccountSummary(accountId, userId);
+  }
+  async findAccountTransactions(accountId: string, userId: string, limit: number, offset: number) {
+    return await this.expensifyBankAccountRepository.getAccountGroupedTransactions(
       accountId,
       userId,
       limit,
@@ -447,7 +450,7 @@ export class ExpensifyService {
     let imported = 0;
     for (const recurringId of recurringIds) {
       const rule = await this.recurringTransactionsRepository.getOne(recurringId);
-      if (!rule || rule.exp_rt_user_id !== userId) {
+      if (!rule || rule.exp_rt_user_id !== userId || rule.exp_rt_kind !== 'recurring') {
         continue;
       }
       console.log(rule);
