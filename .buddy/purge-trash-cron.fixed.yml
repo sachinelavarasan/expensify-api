@@ -1,0 +1,18 @@
+- pipeline: "purge trash cron pipeline"
+  refs:
+    - "refs/heads/main"
+  events:
+    - type: "SCHEDULE"
+      cron: "0 8 1 * *" # trash purge (08:00 UTC on the 1st of each month)
+      timezone: "Etc/UTC"
+  actions:
+    # Uses native HTTP client instead of a slow Docker container
+    - action: "Trigger purge-trash cron"
+      type: "HTTP"
+      notification_url: "https://expensify-api-delta.vercel.app/crons/purge-trash"
+      method: "GET"
+      headers:
+        - name: "x-cron-token"
+          value: "$CRON_SECRET_TOKEN"
+        - name: "Content-Type"
+          value: "application/json"
