@@ -57,6 +57,20 @@
       "when": 1785767718029,
       "tag": "0007_add_transfers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788595541823,
+      "tag": "0008_public_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788597814264,
+      "tag": "0009_opposite_sunfire",
+      "breakpoints": true
     }
   ]
 }

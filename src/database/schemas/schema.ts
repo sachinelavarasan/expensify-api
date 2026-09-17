@@ -255,6 +255,10 @@ export const expRecurringTransactions = pgTable('exp_recurring_transactions', {
   exp_rt_end_date: date('exp_rt_end_date'),
   exp_rt_next_due_date: date('exp_rt_next_due_date').notNull(),
   exp_rt_is_active: boolean('exp_rt_is_active').notNull().default(true),
+  exp_rt_reminder_enabled: boolean('exp_rt_reminder_enabled').notNull().default(false),
+  exp_rt_reminder_days_before: integer('exp_rt_reminder_days_before').notNull().default(0),
+  exp_rt_reminder_time: text('exp_rt_reminder_time'),
+  exp_rt_kind: text('exp_rt_kind').notNull().default('recurring'),
   exp_rt_created_at: timestamp('exp_rt_created_at', { mode: 'string' })
     .notNull()
     .default(sql`now()`),

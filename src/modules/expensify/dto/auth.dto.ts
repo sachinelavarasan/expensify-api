@@ -1,4 +1,15 @@
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from 'class-validator';
 
 export class TransactionDto {
   @IsString()
@@ -157,6 +168,23 @@ export class CreateRecurringTransactionDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be in YYYY-MM-DD format' })
   exp_rt_end_date?: string | null;
 
+  @IsOptional()
+  @IsBoolean()
+  exp_rt_reminder_enabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  exp_rt_reminder_days_before?: number;
+
+  @IsOptional()
+  @IsString()
+  exp_rt_reminder_time?: string | null;
+
+  @IsOptional()
+  @IsIn(['recurring', 'reminder'])
+  exp_rt_kind?: 'recurring' | 'reminder';
+
   exp_rt_user_id: string;
   exp_rt_next_due_date: string;
 }
@@ -177,6 +205,10 @@ export class UpdateRecurringTransactionDto {
   exp_rt_end_date?: string | null;
   exp_rt_next_due_date?: string;
   exp_rt_is_active?: boolean;
+  exp_rt_reminder_enabled?: boolean;
+  exp_rt_reminder_days_before?: number;
+  exp_rt_reminder_time?: string | null;
+  exp_rt_kind?: 'recurring' | 'reminder';
 }
 
 export class CreateDebtDto {

@@ -88,8 +88,10 @@ export class CronjobsService {
           exp_ntto_user_id: userId,
         });
 
-        if (tokenEntries.length) {
-          const count = rules.length;
+        const recurringOnly = rules.filter((rule) => rule.exp_rt_kind === 'recurring');
+
+        if (tokenEntries.length && recurringOnly.length) {
+          const count = recurringOnly.length;
           const messages: ExpoPushMessage[] = tokenEntries.map((tokenEntry) => ({
             to: tokenEntry.exp_ntto_token,
             title: 'New month, new budget!',
@@ -99,7 +101,7 @@ export class CronjobsService {
             data: {
               type: 'recurring-transactions-monthly',
               count,
-              recurringIds: rules.map((rule) => rule.exp_rt_id),
+              recurringIds: recurringOnly.map((rule) => rule.exp_rt_id),
             },
           }));
 

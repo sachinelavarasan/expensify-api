@@ -156,12 +156,7 @@ export class ExpensifyBankAccountRepository {
     });
   }
 
-  async getAccountDetailsWithGroupedTransactionsById(
-    accountId: string,
-    userId: string,
-    limit: number,
-    offset: number,
-  ) {
+  private async getOwnedAccountOrThrow(accountId: string, userId: string) {
     const [account] = await this.dbObject.db
       .select()
       .from(expBankAccounts)
@@ -173,6 +168,32 @@ export class ExpensifyBankAccountRepository {
     if (!account) {
       throw new Error('Account not found or access denied.');
     }
+    return account;
+  }
+
+  async getAccountSummary(accountId: string, userId: string) {
+    const account = await this.getOwnedAccountOrThrow(accountId, userId);
+
+    const [totalTransactionCount, totals] = await Promise.all([
+      this.expensifyTransactionsRepository.getTransactionCountForAccount(userId, accountId),
+      this.expensifyTransactionsRepository.getIncomeExpenseTotalsForAccount(userId, accountId),
+    ]);
+
+    return {
+      ...account,
+      totalTransactionCount,
+      totalIncome: totals.income,
+      totalExpense: totals.expense,
+    };
+  }
+
+  async getAccountGroupedTransactions(
+    accountId: string,
+    userId: string,
+    limit: number,
+    offset: number,
+  ) {
+    await this.getOwnedAccountOrThrow(accountId, userId);
 
     const transactions =
       await this.expensifyTransactionsRepository.getPaginatedTransactionsForAccount(
@@ -222,7 +243,6 @@ export class ExpensifyBankAccountRepository {
     }
 
     return {
-      ...account,
       data: Object.values(groupMap).sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         return (
